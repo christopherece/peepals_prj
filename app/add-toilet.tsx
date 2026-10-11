@@ -20,24 +20,32 @@ export default function AddToiletScreen() {
   const [wheelchair, setWheelchair] = useState(false);
   const [changingTable, setChangingTable] = useState(false);
   const [genderNeutral, setGenderNeutral] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const save = async () => {
     if (!location) {
       Alert.alert('Location needed', "We place the toilet where you're standing, so turn on location first.");
       return;
     }
-    // Unchecked switches mean "don't know" rather than "no".
-    const toilet = await addToilet({
-      ...location,
-      name: name.trim() || 'Public toilet',
-      fee: free ? false : null,
-      access: customersOnly ? 'customers' : 'public',
-      wheelchair: wheelchair || null,
-      changingTable: changingTable || null,
-      genderNeutral: genderNeutral || null,
-      openingHours: hours.trim() || null,
-    });
-    router.replace({ pathname: '/toilet/[id]', params: { id: toilet.id } });
+    setSaving(true);
+    try {
+      // Unchecked switches mean "don't know" rather than "no".
+      const toilet = await addToilet({
+        ...location,
+        name: name.trim() || 'Public toilet',
+        fee: free ? false : null,
+        access: customersOnly ? 'customers' : 'public',
+        wheelchair: wheelchair || null,
+        changingTable: changingTable || null,
+        genderNeutral: genderNeutral || null,
+        openingHours: hours.trim() || null,
+      });
+      router.replace({ pathname: '/toilet/[id]', params: { id: toilet.id } });
+    } catch (e) {
+      Alert.alert('Toilet not added', e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const inputStyle = [styles.input, { color: text, borderColor: muted }];
@@ -58,8 +66,11 @@ export default function AddToiletScreen() {
       <Toggle label="👶 Changing table" value={changingTable} onChange={setChangingTable} />
       <Toggle label="Gender-neutral" value={genderNeutral} onChange={setGenderNeutral} />
 
-      <Pressable onPress={save} style={({ pressed }) => [styles.save, { backgroundColor: tint, opacity: pressed ? 0.8 : 1 }]}>
-        <Text style={styles.saveText}>Add toilet</Text>
+      <Pressable
+        onPress={save}
+        disabled={saving}
+        style={({ pressed }) => [styles.save, { backgroundColor: tint, opacity: pressed || saving ? 0.6 : 1 }]}>
+        <Text style={styles.saveText}>{saving ? 'Adding…' : 'Add toilet'}</Text>
       </Pressable>
 
       {/* Use a light status bar on iOS to account for the black space above the modal */}

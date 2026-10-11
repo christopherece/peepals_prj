@@ -78,6 +78,7 @@ export default function ToiletScreen() {
       <ReviewForm toiletId={toilet.id} />
       {toiletReviews.map((r) => (
         <View key={r.id} style={[styles.card, { backgroundColor: card }]}>
+          <Text style={styles.author}>{r.author}</Text>
           <Text style={{ color: muted }}>
             Clean {r.cleanliness}/5 · Safe {r.safety}/5 · Wait {r.wait}/5 · {new Date(r.createdAt).toLocaleDateString()}
           </Text>
@@ -98,7 +99,7 @@ function InfoRow({ label, value, color }: { label: string; value: string; color?
 }
 
 function ReviewForm({ toiletId }: { toiletId: string }) {
-  const { addReview } = useToilets();
+  const { addReview, profile, reviews } = useToilets();
   const tint = useThemeColor({}, 'tint');
   const card = useThemeColor({}, 'card');
   const text = useThemeColor({}, 'text');
@@ -107,11 +108,21 @@ function ReviewForm({ toiletId }: { toiletId: string }) {
   const [safety, setSafety] = useState(0);
   const [wait, setWait] = useState(0);
   const [comment, setComment] = useState('');
+  const [posting, setPosting] = useState(false);
 
   const complete = cleanliness > 0 && safety > 0 && wait > 0;
+  const alreadyReviewed = reviews.some((r) => r.toiletId === toiletId && r.userId === profile?.id);
 
   const submit = async () => {
-    await addReview({ toiletId, cleanliness, safety, wait, comment: comment.trim() });
+    setPosting(true);
+    try {
+      await addReview({ toiletId, cleanliness, safety, wait, comment: comment.trim() });
+    } catch (e) {
+      Alert.alert('Review not posted', e instanceof Error ? e.message : String(e));
+      return;
+    } finally {
+      setPosting(false);
+    }
     setCleanliness(0);
     setSafety(0);
     setWait(0);
@@ -133,10 +144,12 @@ function ReviewForm({ toiletId }: { toiletId: string }) {
         style={[styles.input, { color: text, borderColor: muted }]}
       />
       <Pressable
-        disabled={!complete}
+        disabled={!complete || posting}
         onPress={submit}
-        style={[styles.submit, { backgroundColor: tint, opacity: complete ? 1 : 0.4 }]}>
-        <Text style={styles.directionsText}>Post review</Text>
+        style={[styles.submit, { backgroundColor: tint, opacity: complete && !posting ? 1 : 0.4 }]}>
+        <Text style={styles.directionsText}>
+          {posting ? 'Posting…' : alreadyReviewed ? 'Update your review' : 'Post review'}
+        </Text>
       </Pressable>
     </View>
   );
@@ -174,6 +187,7 @@ const styles = StyleSheet.create({
   infoValue: { fontSize: 15, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
   source: { fontSize: 12 },
   heading: { fontSize: 20, fontWeight: '700', marginTop: 8 },
+  author: { fontSize: 15, fontWeight: '600' },
   input: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 10, fontSize: 15 },
   submit: { borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
 });

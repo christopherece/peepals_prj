@@ -1,11 +1,23 @@
 import * as Location from 'expo-location';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { backend } from './backend';
 import { distanceMeters } from './format';
 import { isOpenNow } from './openingHours';
 import { fetchNearbyToilets } from './osm';
-import { loadReviews, loadUserToilets, newId, saveReviews, saveUserToilets } from './storage';
-import { NO_FILTERS, type Coords, type Filters, type NearbyToilet, type Review, type Toilet } from './types';
+import {
+  NO_FILTERS,
+  type Coords,
+  type Filters,
+  type NearbyToilet,
+  type NewReview,
+  type NewToilet,
+  type Profile,
+  type Review,
+  type Toilet,
+} from './types';
+
+const SEARCH_RADIUS_METERS = 2000;
 
 type Status = 'locating' | 'loading' | 'ready' | 'error';
 
@@ -21,8 +33,13 @@ type ToiletsContextValue = {
   filters: Filters;
   setFilters: (filters: Filters) => void;
   refresh: () => Promise<void>;
-  addReview: (review: Omit<Review, 'id' | 'createdAt'>) => Promise<void>;
-  addToilet: (toilet: Omit<Toilet, 'id' | 'source'>) => Promise<Toilet>;
+  /** null until sign-in finishes (or if it failed). */
+  profile: Profile | null;
+  /** true when reviews are shared with everyone, false when they stay on this device. */
+  shared: boolean;
+  addReview: (review: NewReview) => Promise<void>;
+  addToilet: (toilet: NewToilet) => Promise<Toilet>;
+  updateNickname: (nickname: string) => Promise<void>;
 };
 
 const ToiletsContext = createContext<ToiletsContextValue | null>(null);
@@ -35,6 +52,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
   const [userToilets, setUserToilets] = useState<Toilet[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -51,8 +69,25 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       setLocation(coords);
 
       setStatus('loading');
-      setOsmToilets(await fetchNearbyToilets(coords));
+      // OSM is the main source; user-added toilets are a bonus, so their failure isn't fatal.
+      const [osm, added] = await Promise.all([
+        fetchNearbyToilets(coords, SEARCH_RADIUS_METERS),
+        backend.fetchUserToilets(coords, SEARCH_RADIUS_METERS).catch((e) => {
+          console.warn(e);
+          return [];
+        }),
+      ]);
+      setOsmToilets(osm);
+      setUserToilets(added);
       setStatus('ready');
+
+      const ids = [...added, ...osm].map((t) => t.id);
+      setReviews(
+        await backend.fetchReviews(ids).catch((e) => {
+          console.warn(e);
+          return [];
+        })
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStatus('error');
@@ -61,8 +96,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     refresh();
-    loadReviews().then(setReviews);
-    loadUserToilets().then(setUserToilets);
+    backend.signIn().then(setProfile, (e) => console.warn(e));
   }, [refresh]);
 
   const allNearby = useMemo<NearbyToilet[]>(() => {
@@ -83,29 +117,63 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
     );
   }, [allNearby, filters]);
 
+  const requireProfile = useCallback(async () => {
+    if (profile) return profile;
+    // Sign-in may have failed at startup (e.g. offline); try again now.
+    const signedIn = await backend.signIn();
+    setProfile(signedIn);
+    return signedIn;
+  }, [profile]);
+
   const addReview = useCallback(
-    async (review: Omit<Review, 'id' | 'createdAt'>) => {
-      const next = [{ ...review, id: newId('review'), createdAt: Date.now() }, ...reviews];
-      setReviews(next);
-      await saveReviews(next);
+    async (review: NewReview) => {
+      const saved = await backend.saveReview(await requireProfile(), review);
+      // Posting again replaces your earlier review of the same toilet.
+      setReviews((prev) => [
+        saved,
+        ...prev.filter((r) => !(r.toiletId === saved.toiletId && r.userId === saved.userId)),
+      ]);
     },
-    [reviews]
+    [requireProfile]
   );
 
   const addToilet = useCallback(
-    async (toilet: Omit<Toilet, 'id' | 'source'>) => {
-      const created: Toilet = { ...toilet, id: newId('user'), source: 'user' };
-      const next = [created, ...userToilets];
-      setUserToilets(next);
-      await saveUserToilets(next);
+    async (toilet: NewToilet) => {
+      const created = await backend.addToilet(await requireProfile(), toilet);
+      setUserToilets((prev) => [created, ...prev]);
       return created;
     },
-    [userToilets]
+    [requireProfile]
+  );
+
+  const updateNickname = useCallback(
+    async (nickname: string) => {
+      const updated = await backend.updateNickname(await requireProfile(), nickname);
+      setProfile(updated);
+      // Show the new name on reviews already on screen.
+      setReviews((prev) => prev.map((r) => (r.userId === updated.id ? { ...r, author: updated.nickname } : r)));
+    },
+    [requireProfile]
   );
 
   const value = useMemo(
-    () => ({ location, status, error, allNearby, visible, reviews, filters, setFilters, refresh, addReview, addToilet }),
-    [location, status, error, allNearby, visible, reviews, filters, refresh, addReview, addToilet]
+    () => ({
+      location,
+      status,
+      error,
+      allNearby,
+      visible,
+      reviews,
+      filters,
+      setFilters,
+      refresh,
+      profile,
+      shared: backend.shared,
+      addReview,
+      addToilet,
+      updateNickname,
+    }),
+    [location, status, error, allNearby, visible, reviews, filters, refresh, profile, addReview, addToilet, updateNickname]
   );
 
   return <ToiletsContext.Provider value={value}>{children}</ToiletsContext.Provider>;

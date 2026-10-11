@@ -39,7 +39,8 @@
         {
           "locationWhenInUsePermission": "Peepals uses your location to find the nearest toilet."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true

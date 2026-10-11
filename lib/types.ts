@@ -25,9 +25,17 @@ export type NearbyToilet = Toilet & {
   distance: number | null;
 };
 
+export type Profile = {
+  id: string;
+  nickname: string;
+};
+
 export type Review = {
   id: string;
   toiletId: string;
+  userId: string;
+  /** Nickname of the reviewer */
+  author: string;
   /** 1–5 for each */
   cleanliness: number;
   safety: number;
@@ -36,6 +44,10 @@ export type Review = {
   comment: string;
   createdAt: number;
 };
+
+export type NewReview = Pick<Review, 'toiletId' | 'cleanliness' | 'safety' | 'wait' | 'comment'>;
+
+export type NewToilet = Omit<Toilet, 'id' | 'source'>;
 
 export type Filters = {
   free: boolean;
