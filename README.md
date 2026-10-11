@@ -9,6 +9,8 @@ npm install
 npx expo start
 ```
 
+The dev server runs on port **2233** (set in `.env`).
+
 Scan the QR code with **Expo Go** on your phone. (The map only works on iOS/Android, not web.)
 
 Without Supabase keys the app runs in **offline mode**: reviews and added toilets are saved only on that phone.
