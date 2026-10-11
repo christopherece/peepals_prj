@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "peepals",
+    "name": "Peepals",
     "slug": "peepals",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -32,6 +32,12 @@
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Peepals uses your location to find the nearest toilet."
         }
       ]
     ],

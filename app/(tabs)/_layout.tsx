@@ -1,6 +1,6 @@
 import { SymbolView } from 'expo-symbols';
 import { Link, Tabs } from 'expo-router';
-import { Platform, Pressable } from 'react-native';
+import { Pressable } from 'react-native';
 
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -20,26 +20,19 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
+          title: 'Peepals',
+          tabBarLabel: 'Map',
           tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
-              }}
-              tintColor={color}
-              size={28}
-            />
+            <SymbolView name={{ ios: 'map', android: 'map', web: 'map' }} tintColor={color} size={28} />
           ),
           headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable style={{ marginRight: 15 }}>
+            <Link href="/add-toilet" asChild>
+              <Pressable style={{ marginRight: 15 }} accessibilityLabel="Add a toilet">
                 {({ pressed }) => (
                   <SymbolView
-                    name={{ ios: 'info.circle', android: 'info', web: 'info' }}
+                    name={{ ios: 'plus.circle', android: 'add_circle', web: 'add_circle' }}
                     size={25}
-                    tintColor={Colors[colorScheme].text}
+                    tintColor={Colors[colorScheme].tint}
                     style={{ opacity: pressed ? 0.5 : 1 }}
                   />
                 )}
@@ -49,19 +42,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="nearby"
         options={{
-          title: 'Tab Two',
+          title: 'Nearby',
           tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
-              }}
-              tintColor={color}
-              size={28}
-            />
+            <SymbolView name={{ ios: 'list.bullet', android: 'list', web: 'list' }} tintColor={color} size={28} />
           ),
         }}
       />
