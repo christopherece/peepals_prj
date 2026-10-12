@@ -1,3 +1,4 @@
+import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -29,9 +30,13 @@ export default function AddToiletScreen() {
     }
     setSaving(true);
     try {
+      // The shared location can be minutes old; pin the toilet where the user is standing now.
+      const here = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
+        .then((p) => ({ latitude: p.coords.latitude, longitude: p.coords.longitude }))
+        .catch(() => location);
       // Unchecked switches mean "don't know" rather than "no".
       const toilet = await addToilet({
-        ...location,
+        ...here,
         name: name.trim() || 'Public toilet',
         fee: free ? false : null,
         access: customersOnly ? 'customers' : 'public',
@@ -51,14 +56,14 @@ export default function AddToiletScreen() {
   const inputStyle = [styles.input, { color: text, borderColor: muted }];
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={{ color: muted }}>The toilet will be pinned at your current location.</Text>
 
       <Text style={styles.label}>Name or place</Text>
-      <TextInput value={name} onChangeText={setName} placeholder="e.g. Central Station, Level 1" placeholderTextColor={muted} style={inputStyle} />
+      <TextInput value={name} onChangeText={setName} placeholder="e.g. Central Station, Level 1" placeholderTextColor={muted} maxLength={100} style={inputStyle} />
 
       <Text style={styles.label}>Opening hours (optional)</Text>
-      <TextInput value={hours} onChangeText={setHours} placeholder="e.g. Mo-Fr 08:00-20:00 or 24/7" placeholderTextColor={muted} autoCapitalize="none" style={inputStyle} />
+      <TextInput value={hours} onChangeText={setHours} placeholder="e.g. Mo-Fr 08:00-20:00 or 24/7" placeholderTextColor={muted} autoCapitalize="none" autoCorrect={false} maxLength={200} style={inputStyle} />
 
       <Toggle label="Free to use" value={free} onChange={setFree} />
       <Toggle label="Customers only" value={customersOnly} onChange={setCustomersOnly} />

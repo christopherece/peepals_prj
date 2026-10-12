@@ -19,7 +19,11 @@ export default function FilterChips() {
   const border = useThemeColor({}, 'border');
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.scroll}
+      contentContainerStyle={styles.row}>
       {CHIPS.map(({ key, label }) => {
         const active = filters[key];
         return (
@@ -41,6 +45,8 @@ export default function FilterChips() {
 }
 
 const styles = StyleSheet.create({
+  // Without this, a horizontal ScrollView in a column stretches to fill spare height when the list below is short.
+  scroll: { flexGrow: 0 },
   row: { gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
   chip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
   label: { fontSize: 14, fontWeight: '500' },

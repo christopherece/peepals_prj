@@ -10,6 +10,7 @@ export type Backend = {
   fetchReviews(toiletIds: string[]): Promise<Review[]>;
   /** Creates or replaces the user's review for that toilet. */
   saveReview(profile: Profile, review: NewReview): Promise<Review>;
+  deleteReview(profile: Profile, toiletId: string): Promise<void>;
   fetchUserToilets(center: Coords, radiusMeters: number): Promise<Toilet[]>;
   addToilet(profile: Profile, toilet: NewToilet): Promise<Toilet>;
 };

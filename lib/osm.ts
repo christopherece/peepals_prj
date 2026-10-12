@@ -3,6 +3,8 @@ import type { Access, Coords, Toilet } from './types';
 // Public Overpass instance — fine for an MVP, but move to our own backend
 // (OSM import into Postgres/PostGIS) before real traffic.
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+// Give up a little after Overpass's own 25 s query timeout so a dead network doesn't spin forever.
+const REQUEST_TIMEOUT_MS = 30_000;
 
 type OsmElement = {
   type: 'node' | 'way' | 'relation';
@@ -13,21 +15,43 @@ type OsmElement = {
   tags?: Record<string, string>;
 };
 
+// Overpass answers these when briefly overloaded; one quick retry usually succeeds.
+const RETRYABLE_STATUSES = [429, 502, 503, 504];
+const RETRY_DELAY_MS = 1500;
+
 export async function fetchNearbyToilets(center: Coords, radiusMeters = 2000): Promise<Toilet[]> {
   const query = `[out:json][timeout:25];nwr["amenity"="toilets"](around:${radiusMeters},${center.latitude},${center.longitude});out center tags;`;
-  const res = await fetch(OVERPASS_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Accept: 'application/json',
-      // Overpass rejects generic client user agents with a 406.
-      'User-Agent': 'Peepals/0.1 (toilet finder app)',
-    },
-    body: 'data=' + encodeURIComponent(query),
-  });
+  let res = await queryOverpass(query);
+  if (RETRYABLE_STATUSES.includes(res.status)) {
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    res = await queryOverpass(query);
+  }
   if (!res.ok) throw new Error(`Couldn't load toilets (Overpass ${res.status}). Try again in a moment.`);
   const json = (await res.json()) as { elements: OsmElement[] };
   return json.elements.map(toToilet).filter((t): t is Toilet => t !== null);
+}
+
+async function queryOverpass(query: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(OVERPASS_URL, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+        // Overpass rejects generic client user agents with a 406.
+        'User-Agent': 'Peepals/0.1 (toilet finder app)',
+      },
+      body: 'data=' + encodeURIComponent(query),
+    });
+  } catch {
+    if (controller.signal.aborted) throw new Error("Couldn't load toilets: the map server took too long. Try again.");
+    throw new Error("Couldn't load toilets. Check your internet connection and try again.");
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function toToilet(el: OsmElement): Toilet | null {

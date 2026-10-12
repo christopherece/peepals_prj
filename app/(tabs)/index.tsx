@@ -11,7 +11,8 @@ import { useToilets } from '@/lib/ToiletsContext';
 
 export default function MapScreen() {
   const router = useRouter();
-  const { location, status, visible, allNearby } = useToilets();
+  const { location, status, visible, allNearby, refresh } = useToilets();
+  const busy = status === 'locating' || status === 'loading';
 
   const openToilet = (id: string) => router.push({ pathname: '/toilet/[id]', params: { id } });
 
@@ -20,7 +21,7 @@ export default function MapScreen() {
     if (!best) {
       Alert.alert(
         'No free toilet found nearby',
-        'Try a café or shopping mall, or turn off filters in the Nearby tab to see paid and customers-only options.'
+        'None of the toilets within 2 km are known to be free and open to everyone. Check the Nearby tab for paid and customers-only options, or try a café or shopping mall.'
       );
       return;
     }
@@ -35,11 +36,28 @@ export default function MapScreen() {
         <FilterChips />
       </View>
 
-      {location && status === 'loading' && (
+      {location && busy && (
         <View style={styles.loading} lightColor="#fff" darkColor="#1E293B">
           <ActivityIndicator />
           <Text>Looking for toilets…</Text>
         </View>
+      )}
+
+      {location && status === 'error' && (
+        <View style={styles.loading} lightColor="#fff" darkColor="#1E293B">
+          <Text>Couldn’t refresh. Tap ↻ to try again.</Text>
+        </View>
+      )}
+
+      {location && (
+        <Pressable
+          onPress={refresh}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel="Re-center on my location and search again"
+          style={({ pressed }) => [styles.refresh, { opacity: pressed || busy ? 0.6 : 1 }]}>
+          <Text style={styles.refreshText}>↻</Text>
+        </Pressable>
       )}
 
       {status === 'ready' && (
@@ -68,6 +86,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
+  refresh: {
+    position: 'absolute',
+    right: 16,
+    bottom: 100,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  refreshText: { fontSize: 24, color: '#0F172A' },
   emergency: {
     position: 'absolute',
     bottom: 24,

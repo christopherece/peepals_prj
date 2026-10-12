@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { distanceMeters } from '../format';
 import type { Profile, Review, Toilet } from '../types';
 import type { Backend } from './types';
 
@@ -55,8 +56,17 @@ export const localBackend: Backend = {
     return saved;
   },
 
-  async fetchUserToilets() {
-    return read<Toilet[]>(USER_TOILETS_KEY, []);
+  async deleteReview(profile, toiletId) {
+    const all = await read<Review[]>(REVIEWS_KEY, []);
+    await write(
+      REVIEWS_KEY,
+      all.filter((r) => !(r.toiletId === toiletId && r.userId === profile.id))
+    );
+  },
+
+  async fetchUserToilets(center, radiusMeters) {
+    const all = await read<Toilet[]>(USER_TOILETS_KEY, []);
+    return all.filter((t) => distanceMeters(center, t) <= radiusMeters);
   },
 
   async addToilet(_profile, toilet) {

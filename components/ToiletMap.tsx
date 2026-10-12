@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 
@@ -12,14 +13,23 @@ type Props = {
   onOpen: (id: string) => void;
 };
 
+const DELTA = 0.02;
+
 export default function ToiletMap({ location, toilets, onOpen }: Props) {
+  const mapRef = useRef<MapView>(null);
   const now = new Date();
+
+  // initialRegion only applies on mount; follow the user when a refresh finds a new location.
+  useEffect(() => {
+    mapRef.current?.animateToRegion({ ...location, latitudeDelta: DELTA, longitudeDelta: DELTA }, 500);
+  }, [location]);
 
   return (
     <MapView
+      ref={mapRef}
       style={StyleSheet.absoluteFill}
       showsUserLocation
-      initialRegion={{ ...location, latitudeDelta: 0.02, longitudeDelta: 0.02 }}>
+      initialRegion={{ ...location, latitudeDelta: DELTA, longitudeDelta: DELTA }}>
       {toilets.map((t) => {
         const open = isOpenNow(t.openingHours, now);
         return (

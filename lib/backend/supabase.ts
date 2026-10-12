@@ -138,6 +138,15 @@ export function createSupabaseBackend(supabase: SupabaseClient): Backend {
       return toReview(data);
     },
 
+    async deleteReview(profile, toiletId) {
+      const { error } = await supabase
+        .from('reviews')
+        .delete()
+        .eq('toilet_id', toiletId)
+        .eq('user_id', profile.id);
+      if (error) throw new Error(`Couldn't delete your review: ${error.message}`);
+    },
+
     async fetchUserToilets(center, radiusMeters) {
       // Bounding box is close enough at city scale; switch to PostGIS when needed.
       const dLat = radiusMeters / 111_320;
