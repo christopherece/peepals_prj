@@ -6,20 +6,24 @@ import { Text as DefaultText, View as DefaultView } from 'react-native';
 
 import { useColorScheme } from './useColorScheme';
 
-import Colors from '@/constants/Colors';
+import Colors, { type ColorName } from '@/constants/Colors';
+import { Type, type TypeName } from '@/constants/Typography';
 
 type ThemeProps = {
   lightColor?: string;
   darkColor?: string;
 };
 
-export type TextProps = ThemeProps & DefaultText['props'];
+export type TextProps = ThemeProps &
+  DefaultText['props'] & {
+    /** Step on the type scale (constants/Typography.ts). Defaults to plain 14pt text. */
+    type?: TypeName;
+    /** Low-contrast secondary text (distances, timestamps, hints). */
+    muted?: boolean;
+  };
 export type ViewProps = ThemeProps & DefaultView['props'];
 
-export function useThemeColor(
-  props: { light?: string; dark?: string },
-  colorName: keyof typeof Colors.light & keyof typeof Colors.dark
-) {
+export function useThemeColor(props: { light?: string; dark?: string }, colorName: ColorName) {
   const theme = useColorScheme();
   const colorFromProps = props[theme];
 
@@ -31,10 +35,10 @@ export function useThemeColor(
 }
 
 export function Text(props: TextProps) {
-  const { style, lightColor, darkColor, ...otherProps } = props;
-  const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
+  const { style, lightColor, darkColor, type, muted, ...otherProps } = props;
+  const color = useThemeColor({ light: lightColor, dark: darkColor }, muted ? 'muted' : 'text');
 
-  return <DefaultText style={[{ color }, style]} {...otherProps} />;
+  return <DefaultText style={[{ color }, type && Type[type], style]} {...otherProps} />;
 }
 
 export function View(props: ViewProps) {

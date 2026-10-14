@@ -14,6 +14,7 @@ import {
   type NewToilet,
   type Profile,
   type Review,
+  type SignInMethod,
   type Toilet,
 } from './types';
 
@@ -33,14 +34,42 @@ type ToiletsContextValue = {
   filters: Filters;
   setFilters: (filters: Filters) => void;
   refresh: () => Promise<void>;
-  /** null until sign-in finishes (or if it failed). */
+  /** The signed-in member, or null for a guest. Guests can browse; contributing needs a profile. */
   profile: Profile | null;
+  /** false until we know whether a member is signed in. */
+  authReady: boolean;
   /** true when reviews are shared with everyone, false when they stay on this device. */
   shared: boolean;
+  sendEmailCode: (email: string) => Promise<void>;
+  signIn: (method: SignInMethod) => Promise<void>;
+  signOut: () => Promise<void>;
+  /** These throw for guests; gate the UI with `useRequireMember` first. */
   addReview: (review: NewReview) => Promise<void>;
   addToilet: (toilet: NewToilet) => Promise<Toilet>;
   updateNickname: (nickname: string) => Promise<void>;
 };
+
+const POSITION_TIMEOUT_MS = 15_000;
+
+/** A recent fix if there is one, else a fresh one; falls back to an older fix rather than failing. */
+async function getPosition(): Promise<Location.LocationObject> {
+  const recent = await Location.getLastKnownPositionAsync({ maxAge: 60_000 });
+  if (recent) return recent;
+  try {
+    return await Promise.race([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Timed out finding your location.')), POSITION_TIMEOUT_MS)
+      ),
+    ]);
+  } catch (e) {
+    // Indoors or with GPS off, an older position still finds toilets nearby.
+    const stale = await Location.getLastKnownPositionAsync();
+    if (stale) return stale;
+    console.warn(e);
+    throw new Error("Couldn't find your location. Check that location is turned on, then try again.");
+  }
+}
 
 const ToiletsContext = createContext<ToiletsContextValue | null>(null);
 
@@ -53,6 +82,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -62,9 +92,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       if (permission.status !== 'granted') {
         throw new Error('Peepals needs your location to find toilets near you.');
       }
-      const position =
-        (await Location.getLastKnownPositionAsync({ maxAge: 60_000 })) ??
-        (await Location.getCurrentPositionAsync());
+      const position = await getPosition();
       const coords = { latitude: position.coords.latitude, longitude: position.coords.longitude };
       setLocation(coords);
 
@@ -96,8 +124,17 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     refresh();
-    backend.signIn().then(setProfile, (e) => console.warn(e));
   }, [refresh]);
+
+  useEffect(() => {
+    const loadMember = () =>
+      backend
+        .getMember()
+        .then(setProfile, (e) => console.warn(e))
+        .finally(() => setAuthReady(true));
+    loadMember();
+    return backend.onMemberChange(loadMember);
+  }, []);
 
   const allNearby = useMemo<NearbyToilet[]>(() => {
     return [...userToilets, ...osmToilets]
@@ -118,12 +155,18 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
   }, [allNearby, filters]);
 
   const requireProfile = useCallback(async () => {
-    if (profile) return profile;
-    // Sign-in may have failed at startup (e.g. offline); try again now.
-    const signedIn = await backend.signIn();
-    setProfile(signedIn);
-    return signedIn;
+    if (!profile) throw new Error('Sign in to join the Peepals community first.');
+    return profile;
   }, [profile]);
+
+  const signIn = useCallback(async (method: SignInMethod) => {
+    setProfile(await backend.signIn(method));
+  }, []);
+
+  const signOut = useCallback(async () => {
+    await backend.signOut();
+    setProfile(null);
+  }, []);
 
   const addReview = useCallback(
     async (review: NewReview) => {
@@ -168,12 +211,32 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       setFilters,
       refresh,
       profile,
+      authReady,
       shared: backend.shared,
+      sendEmailCode: backend.sendEmailCode,
+      signIn,
+      signOut,
       addReview,
       addToilet,
       updateNickname,
     }),
-    [location, status, error, allNearby, visible, reviews, filters, refresh, profile, addReview, addToilet, updateNickname]
+    [
+      location,
+      status,
+      error,
+      allNearby,
+      visible,
+      reviews,
+      filters,
+      refresh,
+      profile,
+      authReady,
+      signIn,
+      signOut,
+      addReview,
+      addToilet,
+      updateNickname,
+    ]
   );
 
   return <ToiletsContext.Provider value={value}>{children}</ToiletsContext.Provider>;

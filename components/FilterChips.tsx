@@ -1,6 +1,8 @@
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { Text, useThemeColor } from '@/components/Themed';
+import { Radius, Space } from '@/constants/Typography';
 import { useToilets } from '@/lib/ToiletsContext';
 import type { Filters } from '@/lib/types';
 
@@ -12,14 +14,20 @@ const CHIPS: { key: keyof Filters; label: string }[] = [
   { key: 'genderNeutral', label: 'Gender-neutral' },
 ];
 
-export default function FilterChips() {
+/** `floating`: shadowed chips for use over the map instead of on a plain background. */
+export default function FilterChips({ floating = false }: { floating?: boolean }) {
   const { filters, setFilters } = useToilets();
   const tint = useThemeColor({}, 'tint');
-  const card = useThemeColor({}, 'card');
+  const onTint = useThemeColor({}, 'onTint');
+  const card = useThemeColor({}, floating ? 'elevated' : 'card');
   const border = useThemeColor({}, 'border');
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.scroll}
+      contentContainerStyle={styles.row}>
       {CHIPS.map(({ key, label }) => {
         const active = filters[key];
         return (
@@ -27,12 +35,22 @@ export default function FilterChips() {
             key={key}
             accessibilityRole="switch"
             accessibilityState={{ checked: active }}
-            onPress={() => setFilters({ ...filters, [key]: !active })}
-            style={[
+            onPress={() => {
+              if (Platform.OS !== 'web') Haptics.selectionAsync();
+              setFilters({ ...filters, [key]: !active });
+            }}
+            style={({ pressed }) => [
               styles.chip,
-              { backgroundColor: active ? tint : card, borderColor: active ? tint : border },
+              floating && styles.floating,
+              {
+                backgroundColor: active ? tint : card,
+                borderColor: active ? tint : border,
+                opacity: pressed ? 0.7 : 1,
+              },
             ]}>
-            <Text style={[styles.label, active && styles.activeLabel]}>{label}</Text>
+            <Text type="subhead" style={active && { color: onTint }}>
+              {label}
+            </Text>
           </Pressable>
         );
       })}
@@ -41,8 +59,20 @@ export default function FilterChips() {
 }
 
 const styles = StyleSheet.create({
-  row: { gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  chip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
-  label: { fontSize: 14, fontWeight: '500' },
-  activeLabel: { color: '#fff' },
+  // A horizontal ScrollView otherwise grows to fill a column layout.
+  scroll: { flexGrow: 0 },
+  row: { gap: Space.sm, paddingHorizontal: Space.md, paddingVertical: Space.sm },
+  chip: {
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  floating: {
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
 });

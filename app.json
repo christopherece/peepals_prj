@@ -40,7 +40,16 @@
           "locationWhenInUsePermission": "Peepals uses your location to find the nearest toilet."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Peepals lets you attach photos of toilets to help other people.",
+          "cameraPermission": "Peepals lets you take photos of toilets to help other people.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

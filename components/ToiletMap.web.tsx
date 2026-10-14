@@ -7,6 +7,7 @@ type Props = {
   location: Coords;
   toilets: NearbyToilet[];
   onOpen: (id: string) => void;
+  bottomInset?: number;
 };
 
 // react-native-maps has no web support. The web build is only for quick UI checks.

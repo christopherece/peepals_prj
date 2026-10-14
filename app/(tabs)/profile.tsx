@@ -1,37 +1,105 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
-import { Text, View, useThemeColor } from '@/components/Themed';
+import PressableScale from '@/components/PressableScale';
+import StatusBadge from '@/components/StatusBadge';
+import { Text, useThemeColor } from '@/components/Themed';
+import { Radius, Space } from '@/constants/Typography';
 import { useToilets } from '@/lib/ToiletsContext';
+import { useRequireMember } from '@/lib/useRequireMember';
 
 export default function ProfileScreen() {
-  const { profile, shared, reviews } = useToilets();
+  const { profile, authReady, shared, reviews } = useToilets();
   const card = useThemeColor({}, 'card');
-  const muted = useThemeColor({}, 'muted');
 
-  const myReviewCount = reviews.filter((r) => r.userId === profile?.id).length;
+  const myReviewCount = profile ? reviews.filter((r) => r.userId === profile.id).length : 0;
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      {/* Keyed so the field resets when sign-in finishes or the nickname is saved. */}
-      <NicknameCard key={profile?.nickname ?? 'signing-in'} />
+      {!authReady ? (
+        <ActivityIndicator style={styles.loading} />
+      ) : profile ? (
+        <>
+          <MemberHeader reviewCount={myReviewCount} />
+          {/* Keyed so the field resets when the nickname is saved. */}
+          <NicknameCard key={profile.nickname} />
+          <View style={[styles.card, { backgroundColor: card }]}>
+            <Text type="headline">{shared ? '🌍 Shared with everyone' : '📱 Offline mode'}</Text>
+            <Text type="footnote" muted>
+              {shared
+                ? 'Your reviews, photos and added toilets help every Peepal nearby.'
+                : 'Your reviews, photos and added toilets are only saved on this phone.'}
+            </Text>
+          </View>
+          <SignOutButton />
+        </>
+      ) : (
+        <GuestCard />
+      )}
+    </ScrollView>
+  );
+}
 
-      <View style={[styles.card, { backgroundColor: card }]}>
-        <Text style={styles.label}>Reviews nearby by you: {myReviewCount}</Text>
-        <Text style={{ color: muted }}>
-          {shared
-            ? 'Your reviews and added toilets are shared with every Peepal.'
-            : 'Offline mode: your reviews and added toilets are only saved on this phone.'}
+function MemberHeader({ reviewCount }: { reviewCount: number }) {
+  const { profile } = useToilets();
+  const card = useThemeColor({}, 'card');
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'onTint');
+  if (!profile) return null;
+
+  return (
+    <View style={[styles.card, styles.member, { backgroundColor: card }]}>
+      <View style={[styles.avatar, { backgroundColor: tint }]}>
+        <Text type="title" style={{ color: onTint }}>
+          {profile.nickname.slice(0, 1).toUpperCase()}
         </Text>
       </View>
-    </ScrollView>
+      <View style={styles.memberText}>
+        <Text type="title" numberOfLines={1}>
+          {profile.nickname}
+        </Text>
+        {profile.email && (
+          <Text type="footnote" muted numberOfLines={1}>
+            {profile.email}
+          </Text>
+        )}
+        <StatusBadge tone="success" label={`Peepal · ${reviewCount} review${reviewCount === 1 ? '' : 's'} nearby`} />
+      </View>
+    </View>
+  );
+}
+
+function GuestCard() {
+  const requireMember = useRequireMember();
+  const card = useThemeColor({}, 'card');
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'onTint');
+
+  return (
+    <View style={[styles.card, styles.guest, { backgroundColor: card }]}>
+      <Text style={styles.emoji}>🚻</Text>
+      <Text type="title" style={styles.center}>
+        You&apos;re browsing as a guest
+      </Text>
+      <Text type="callout" muted style={styles.center}>
+        The map, search and directions are free for everyone. Sign in with your email to review toilets, share photos
+        and add missing spots.
+      </Text>
+      <PressableScale onPress={() => requireMember('profile')} style={[styles.button, { backgroundColor: tint }]}>
+        <Text type="headline" style={{ color: onTint }}>
+          Join the Peepals community
+        </Text>
+      </PressableScale>
+    </View>
   );
 }
 
 function NicknameCard() {
   const { profile, updateNickname } = useToilets();
   const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'onTint');
   const card = useThemeColor({}, 'card');
+  const elevated = useThemeColor({}, 'elevated');
   const text = useThemeColor({}, 'text');
   const muted = useThemeColor({}, 'muted');
 
@@ -54,32 +122,68 @@ function NicknameCard() {
 
   return (
     <View style={[styles.card, { backgroundColor: card }]}>
-      <Text style={styles.label}>Your nickname</Text>
-      <Text style={{ color: muted }}>Shown on your reviews.</Text>
+      <Text type="headline">Nickname</Text>
+      <Text type="footnote" muted>
+        Shown on your reviews and tips.
+      </Text>
       <TextInput
         value={nickname}
         onChangeText={setNickname}
-        editable={!!profile}
-        placeholder={profile ? 'e.g. Throne Explorer' : 'Signing in…'}
+        placeholder="e.g. Throne Explorer"
         placeholderTextColor={muted}
         maxLength={30}
-        style={[styles.input, { color: text, borderColor: muted }]}
+        style={[styles.input, { color: text, backgroundColor: elevated }]}
       />
-      <Pressable
-        onPress={save}
-        disabled={!canSave}
-        style={[styles.button, { backgroundColor: tint, opacity: canSave ? 1 : 0.4 }]}>
-        <Text style={styles.buttonText}>{saving ? 'Saving…' : 'Save'}</Text>
-      </Pressable>
+      <PressableScale onPress={save} disabled={!canSave} style={[styles.button, { backgroundColor: tint }]}>
+        <Text type="headline" style={{ color: onTint }}>
+          {saving ? 'Saving…' : 'Save'}
+        </Text>
+      </PressableScale>
     </View>
   );
 }
 
+function SignOutButton() {
+  const { signOut } = useToilets();
+  const danger = useThemeColor({}, 'danger');
+
+  const confirm = () =>
+    Alert.alert('Sign out?', 'You can keep browsing as a guest.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: () =>
+          signOut().catch((e) => Alert.alert('Sign-out failed', e instanceof Error ? e.message : String(e))),
+      },
+    ]);
+
+  return (
+    <PressableScale haptic={false} onPress={confirm} style={styles.signOut}>
+      <Text type="headline" style={{ color: danger }}>
+        Sign out
+      </Text>
+    </PressableScale>
+  );
+}
+
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 12 },
-  card: { borderRadius: 16, padding: 16, gap: 8 },
-  label: { fontSize: 16, fontWeight: '600' },
-  input: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12, fontSize: 16 },
-  button: { borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  content: { padding: Space.lg, gap: Space.md },
+  loading: { marginTop: Space.xl * 2 },
+  card: { borderRadius: Radius.md, padding: Space.lg, gap: Space.sm },
+  member: { flexDirection: 'row', alignItems: 'center', gap: Space.lg },
+  memberText: { flex: 1, gap: Space.xs },
+  avatar: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+  guest: { alignItems: 'center', paddingVertical: Space.xl, gap: Space.md },
+  emoji: { fontSize: 44 },
+  center: { textAlign: 'center' },
+  input: { borderRadius: Radius.sm, padding: Space.md, fontSize: 16 },
+  button: {
+    alignSelf: 'stretch',
+    borderRadius: Radius.pill,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signOut: { alignItems: 'center', paddingVertical: Space.md },
 });

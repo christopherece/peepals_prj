@@ -1,165 +1,111 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
-import Stars from '@/components/Stars';
-import { Text, View, useThemeColor } from '@/components/Themed';
-import { emergencyRed, openGreen } from '@/constants/Colors';
-import {
-  accessLabel,
-  feeLabel,
-  formatDistance,
-  formatWalk,
-  openLabel,
-  ratingSummary,
-  yesNoLabel,
-} from '@/lib/format';
+import PhotoStrip from '@/components/PhotoStrip';
+import PressableScale from '@/components/PressableScale';
+import ReviewSection from '@/components/ReviewSection';
+import SheetGrabber from '@/components/SheetGrabber';
+import StatusBadge from '@/components/StatusBadge';
+import { Text, useThemeColor } from '@/components/Themed';
+import { emergencyRed } from '@/constants/Colors';
+import { Radius, Space } from '@/constants/Typography';
+import { accessLabel, feeLabel, formatDistance, formatHours, formatWalk, yesNoLabel } from '@/lib/format';
 import { isOpenNow } from '@/lib/openingHours';
+import { toiletStatus } from '@/lib/status';
 import { useToilets } from '@/lib/ToiletsContext';
 import type { Toilet } from '@/lib/types';
 
-export default function ToiletScreen() {
+/**
+ * Toilet details, shown as a bottom sheet over the map (see app/_layout.tsx).
+ * The small detent shows the essentials and the directions button; drag up for photos and reviews.
+ */
+export default function ToiletSheet() {
   const { id, emergency } = useLocalSearchParams<{ id: string; emergency?: string }>();
-  const { allNearby, reviews } = useToilets();
-  const tint = useThemeColor({}, 'tint');
+  const { allNearby } = useToilets();
   const card = useThemeColor({}, 'card');
-  const muted = useThemeColor({}, 'muted');
+  const tint = useThemeColor({}, 'tint');
+  const onTint = useThemeColor({}, 'onTint');
 
   const toilet = allNearby.find((t) => t.id === id);
   if (!toilet) {
     return (
       <View style={styles.centered}>
-        <Text>This toilet isn’t nearby anymore.</Text>
+        <Text type="callout" muted>
+          This toilet isn’t nearby anymore.
+        </Text>
       </View>
     );
   }
 
-  const open = isOpenNow(toilet.openingHours);
-  const toiletReviews = reviews.filter((r) => r.toiletId === toilet.id);
-  const rating = ratingSummary(toiletReviews);
+  const status = toiletStatus(toilet);
+  const hoursUnknown = isOpenNow(toilet.openingHours) === null;
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <Stack.Screen options={{ title: toilet.name }} />
-
+      <SheetGrabber />
       {emergency === '1' && (
         <View style={[styles.banner, { backgroundColor: emergencyRed }]}>
-          <Text style={styles.bannerTitle}>Nearest free toilet</Text>
-          <Text style={styles.bannerText}>
-            {formatDistance(toilet.distance)} · {formatWalk(toilet.distance)}
-            {open === null ? ' · hours unknown, may be closed' : ''}
+          <Text type="headline" style={styles.bannerText}>
+            🚨 Nearest free toilet
           </Text>
+          {hoursUnknown && (
+            <Text type="footnote" style={styles.bannerText}>
+              Hours unknown, so it may be closed.
+            </Text>
+          )}
         </View>
       )}
 
-      <Pressable
+      <View style={styles.titleBlock}>
+        <Text type="title" numberOfLines={2}>
+          {toilet.name}
+        </Text>
+        <View style={styles.metaRow}>
+          <StatusBadge tone={status.tone} label={status.label} />
+          <Text type="footnote" muted>
+            {[formatDistance(toilet.distance), formatWalk(toilet.distance), feeLabel(toilet)]
+              .filter(Boolean)
+              .join(' · ')}
+          </Text>
+        </View>
+      </View>
+
+      <PressableScale
         onPress={() => openDirections(toilet)}
-        style={({ pressed }) => [styles.directions, { backgroundColor: tint, opacity: pressed ? 0.8 : 1 }]}>
-        <Text style={styles.directionsText}>🚶 Walking directions</Text>
-      </Pressable>
+        accessibilityRole="button"
+        style={[styles.directions, { backgroundColor: tint }]}>
+        <Text type="headline" style={{ color: onTint }}>
+          🚶 Walking directions
+        </Text>
+      </PressableScale>
+
+      <PhotoStrip toiletId={toilet.id} />
 
       <View style={[styles.card, { backgroundColor: card }]}>
-        <InfoRow label="Status" value={openLabel(open)} color={open === true ? openGreen : open === false ? emergencyRed : undefined} />
-        <InfoRow label="Hours" value={toilet.openingHours ?? 'Unknown'} />
-        <InfoRow label="Cost" value={feeLabel(toilet)} />
+        <InfoRow label="Hours" value={formatHours(toilet.openingHours)} />
         <InfoRow label="Access" value={accessLabel(toilet)} />
         <InfoRow label="Wheelchair accessible" value={yesNoLabel(toilet.wheelchair)} />
         <InfoRow label="Changing table" value={yesNoLabel(toilet.changingTable)} />
         <InfoRow label="Gender-neutral" value={yesNoLabel(toilet.genderNeutral)} />
-        <InfoRow label="Distance" value={formatDistance(toilet.distance) || 'Unknown'} />
-        <Text style={[styles.source, { color: muted }]}>
+        <Text type="caption" muted>
           {toilet.source === 'osm' ? 'Data © OpenStreetMap contributors' : 'Added by a Peepal'}
         </Text>
       </View>
 
-      <Text style={styles.heading}>
-        Reviews {rating ? `· ★ ${rating.average.toFixed(1)} (${rating.count})` : ''}
-      </Text>
-      <ReviewForm toiletId={toilet.id} />
-      {toiletReviews.map((r) => (
-        <View key={r.id} style={[styles.card, { backgroundColor: card }]}>
-          <Text style={styles.author}>{r.author}</Text>
-          <Text style={{ color: muted }}>
-            Clean {r.cleanliness}/5 · Safe {r.safety}/5 · Wait {r.wait}/5 · {new Date(r.createdAt).toLocaleDateString()}
-          </Text>
-          {r.comment ? <Text>{r.comment}</Text> : null}
-        </View>
-      ))}
+      <ReviewSection toiletId={toilet.id} />
     </ScrollView>
   );
 }
 
-function InfoRow({ label, value, color }: { label: string; value: string; color?: string }) {
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.infoRow} lightColor="transparent" darkColor="transparent">
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={[styles.infoValue, color ? { color } : null]}>{value}</Text>
-    </View>
-  );
-}
-
-function ReviewForm({ toiletId }: { toiletId: string }) {
-  const { addReview, profile, reviews } = useToilets();
-  const tint = useThemeColor({}, 'tint');
-  const card = useThemeColor({}, 'card');
-  const text = useThemeColor({}, 'text');
-  const muted = useThemeColor({}, 'muted');
-  const [cleanliness, setCleanliness] = useState(0);
-  const [safety, setSafety] = useState(0);
-  const [wait, setWait] = useState(0);
-  const [comment, setComment] = useState('');
-  const [posting, setPosting] = useState(false);
-
-  const complete = cleanliness > 0 && safety > 0 && wait > 0;
-  const alreadyReviewed = reviews.some((r) => r.toiletId === toiletId && r.userId === profile?.id);
-
-  const submit = async () => {
-    setPosting(true);
-    try {
-      await addReview({ toiletId, cleanliness, safety, wait, comment: comment.trim() });
-    } catch (e) {
-      Alert.alert('Review not posted', e instanceof Error ? e.message : String(e));
-      return;
-    } finally {
-      setPosting(false);
-    }
-    setCleanliness(0);
-    setSafety(0);
-    setWait(0);
-    setComment('');
-    Alert.alert('Thanks, Peepal! 🧻', 'Your review helps the next person in a hurry.');
-  };
-
-  return (
-    <View style={[styles.card, { backgroundColor: card }]}>
-      <RatingRow label="Cleanliness" value={cleanliness} onChange={setCleanliness} />
-      <RatingRow label="Safety" value={safety} onChange={setSafety} />
-      <RatingRow label="Wait time (5 = none)" value={wait} onChange={setWait} />
-      <TextInput
-        value={comment}
-        onChangeText={setComment}
-        placeholder="Anything to know? (optional)"
-        placeholderTextColor={muted}
-        maxLength={280}
-        style={[styles.input, { color: text, borderColor: muted }]}
-      />
-      <Pressable
-        disabled={!complete || posting}
-        onPress={submit}
-        style={[styles.submit, { backgroundColor: tint, opacity: complete && !posting ? 1 : 0.4 }]}>
-        <Text style={styles.directionsText}>
-          {posting ? 'Posting…' : alreadyReviewed ? 'Update your review' : 'Post review'}
-        </Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function RatingRow({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
-  return (
-    <View style={styles.infoRow} lightColor="transparent" darkColor="transparent">
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Stars value={value} onChange={onChange} size={24} />
+    <View style={styles.infoRow}>
+      <Text type="callout" muted>
+        {label}
+      </Text>
+      <Text type="callout" style={styles.infoValue}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -174,20 +120,19 @@ function openDirections(t: Toilet) {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 12 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  banner: { borderRadius: 16, padding: 16, gap: 4 },
-  bannerTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  bannerText: { color: '#fff', fontSize: 16 },
-  directions: { borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
-  directionsText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  card: { borderRadius: 16, padding: 16, gap: 10 },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  infoLabel: { fontSize: 15 },
-  infoValue: { fontSize: 15, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
-  source: { fontSize: 12 },
-  heading: { fontSize: 20, fontWeight: '700', marginTop: 8 },
-  author: { fontSize: 15, fontWeight: '600' },
-  input: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 10, fontSize: 15 },
-  submit: { borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
+  content: {
+    padding: Space.lg,
+    paddingTop: Platform.OS === 'ios' ? Space.xl : Space.sm,
+    gap: Space.lg,
+    paddingBottom: Space.xl * 2,
+  },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Space.xl },
+  banner: { borderRadius: Radius.md, padding: Space.md, gap: 2 },
+  bannerText: { color: '#fff' },
+  titleBlock: { gap: Space.sm },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Space.sm },
+  directions: { borderRadius: Radius.pill, minHeight: 52, alignItems: 'center', justifyContent: 'center' },
+  card: { borderRadius: Radius.md, padding: Space.lg, gap: Space.md },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Space.md },
+  infoValue: { fontWeight: '600', flexShrink: 1, textAlign: 'right' },
 });

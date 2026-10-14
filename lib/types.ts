@@ -25,9 +25,33 @@ export type NearbyToilet = Toilet & {
   distance: number | null;
 };
 
+/** A signed-in community member. Guests have no profile. */
 export type Profile = {
   id: string;
   nickname: string;
+  email: string | null;
+};
+
+/**
+ * How a guest becomes a member: always by email. With Supabase the address is verified with a
+ * 6-digit code; in offline mode (`device`) nothing can be sent, so the profile just lives on this phone.
+ */
+export type SignInMethod =
+  { kind: 'email-code'; email: string; code: string } | { kind: 'device'; email: string; nickname: string };
+
+export type Photo = {
+  id: string;
+  toiletId: string;
+  userId: string;
+  /** Displayable URL (public storage URL, or a file:// URI in offline mode). */
+  url: string;
+  createdAt: number;
+};
+
+/** A photo picked from the camera or library, not uploaded yet. */
+export type PickedPhoto = {
+  uri: string;
+  mimeType: string;
 };
 
 export type Review = {

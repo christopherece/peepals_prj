@@ -5,6 +5,8 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import Colors from '@/constants/Colors';
+import { Radius } from '@/constants/Typography';
 import { ToiletsProvider } from '@/lib/ToiletsContext';
 
 export {
@@ -13,7 +15,7 @@ export {
 } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
+  // Ensure that reloading on a sheet route keeps the tabs underneath.
   initialRouteName: '(tabs)',
 };
 
@@ -43,16 +45,48 @@ export default function RootLayout() {
   return <RootLayoutNav />;
 }
 
+/** React Navigation theme built from our tokens, so tab bars and screen backgrounds match the app. */
+function navigationTheme(scheme: 'light' | 'dark') {
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const c = Colors[scheme];
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: c.tint,
+      background: c.background,
+      card: c.elevated,
+      text: c.text,
+      border: c.border,
+    },
+  };
+}
+
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
+  // Native bottom sheets (UISheetPresentationController / Material bottom sheet).
+  // Sheets render their own titles: native headers don't show inside form sheets.
+  const sheet = {
+    presentation: 'formSheet',
+    headerShown: false,
+    sheetGrabberVisible: true,
+    sheetCornerRadius: Radius.lg,
+    contentStyle: { backgroundColor: Colors[colorScheme].elevated },
+  } as const;
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={navigationTheme(colorScheme)}>
       <ToiletsProvider>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="toilet/[id]" options={{ title: 'Toilet' }} />
-          <Stack.Screen name="add-toilet" options={{ presentation: 'modal', title: 'Add a toilet' }} />
+          {/* At the small detent the map stays visible and usable above the card. */}
+          <Stack.Screen
+            name="toilet/[id]"
+            options={{ ...sheet, sheetAllowedDetents: [0.45, 1], sheetLargestUndimmedDetentIndex: 0 }}
+          />
+          <Stack.Screen name="add-toilet" options={{ ...sheet, sheetAllowedDetents: [0.8, 1] }} />
+          <Stack.Screen name="sign-in" options={{ ...sheet, sheetAllowedDetents: [0.7, 1] }} />
         </Stack>
       </ToiletsProvider>
     </ThemeProvider>
