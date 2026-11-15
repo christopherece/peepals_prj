@@ -55,7 +55,7 @@ Any new persisted feature must be added to the `Backend` interface and implement
 
 **Routes:** `app/(tabs)/` holds the Map (`index`, full-bleed, no header), Nearby list and Profile tabs. `toilet/[id]`, `add-toilet` and `sign-in` are native bottom sheets (`presentation: 'formSheet'` with detents, set in `app/_layout.tsx`). Native headers don't render in form sheets, so each sheet draws its own title.
 - `toilet/[id]` looks the toilet up in `allNearby`, so it only works for toilets in the current 2 km load (no fetch-by-id). The `emergency=1` param shows the red "Nearest free toilet" banner. Directions open Apple Maps on iOS, Google Maps elsewhere, in walking mode.
-- `add-toilet` is opened by the map's + FAB and pins the toilet at the user's current location (no map picker). Unchecked switches are saved as `null` (unknown), not `false`.
+- `add-toilet` is opened by the map's + FAB and pins the toilet at a fresh GPS fix (no map picker). Unchecked switches are saved as unknown (`null`, or `access: 'unknown'`), not `false`.
 - Reviews are one per user per toilet in both backends; posting again replaces the old one (UI says "Update your review"). The star average in `lib/format.ts` `ratingSummary` averages the three scores.
 
 ## UI conventions

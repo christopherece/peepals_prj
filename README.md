@@ -37,7 +37,7 @@ Anyone can browse the map, search and get directions as a **guest**. Leaving a r
 Builds run in the cloud with [EAS](https://docs.expo.dev/build/introduction/); profiles are in `eas.json`.
 You need an Expo account, an Apple Developer account (99 USD/year) and a Google Play Console account (25 USD once).
 
-1. **App IDs.** `app.json` uses `com.peepals.app` for both `ios.bundleIdentifier` and `android.package`.
+1. **App IDs.** `app.json` uses `com.christopherece.peepals` for both `ios.bundleIdentifier` and `android.package`.
    Change it now if you want a different one: it can't be changed after the first store release.
 2. **Link the project:** `npx eas-cli@latest login`, then `npx eas-cli@latest init`.
 3. **Environment variables.** `.env.local` is git-ignored, so cloud builds never see it. Without these the

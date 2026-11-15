@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.peepals.app",
+      "bundleIdentifier": "com.christopherece.peepals",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -46,7 +46,7 @@
       }
     },
     "android": {
-      "package": "com.peepals.app",
+      "package": "com.christopherece.peepals",
       "adaptiveIcon": {
         "backgroundColor": "#0D9488",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

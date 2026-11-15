@@ -61,7 +61,8 @@ export default function AddToiletSheet() {
         ...(await currentSpot(location)),
         name: name.trim() || 'Public toilet',
         fee: free ? false : null,
-        access: customersOnly ? 'customers' : 'public',
+        // Off means "not sure", like the other switches: the label then reads "Access unknown".
+        access: customersOnly ? 'customers' : 'unknown',
         wheelchair: wheelchair || null,
         changingTable: changingTable || null,
         genderNeutral: genderNeutral || null,
