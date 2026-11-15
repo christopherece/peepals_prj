@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Read `AGENTS.md` first: it holds the Expo rules (fetch versioned docs before touching Expo APIs, `npx expo install` for deps, CNG / no hand-edited `ios/` `android/`). This project is on **Expo SDK 57** (docs: https://docs.expo.dev/versions/v57.0.0/). Routes live in `app/` at the repo root (there is no `src/`). The `@/*` path alias maps to the repo root (`@/lib/...`, `@/components/...`).
+Read `AGENTS.md` first: it holds the Expo rules (fetch versioned docs before touching Expo APIs, `npx expo install` for deps, CNG / no hand-edited `ios/` `android/`). This project is on **Expo SDK 58** (docs: https://docs.expo.dev/versions/v58.0.0/). Routes live in `app/` at the repo root (there is no `src/`). The `@/*` path alias maps to the repo root (`@/lib/...`, `@/components/...`).
 
 ## What the app is
 
@@ -33,7 +33,7 @@ The map (`react-native-maps`) only works on iOS/Android; `components/ToiletMap.w
 - `visible`: `allNearby` with the user's `Filters` applied (used by map/list).
 
 **Two toilet sources, merged client-side:**
-- `lib/osm.ts` queries public Overpass mirrors in order (10 s timeout each; the main one often returns 504) within 2 km and maps OSM tags to `Toilet` (ids like `osm-node-123`; private/`access=no` toilets are dropped). A failure here is fatal for the load.
+- `lib/osm.ts` queries public Overpass mirrors (20 s timeout each; they often return 502/504 or hang) within 2 km and maps OSM tags to `Toilet` (ids like `osm-node-123`; private/`access=no` toilets are dropped). Mirrors are hedged (`queryOverpass`): the next one is asked as soon as one fails or after 4 s. Each successful load is saved by `lib/toiletCache.ts`; when every mirror fails, the context falls back to that copy (if it was loaded within 1 km) or to user-added toilets alone and sets `notice`, which the Map and Nearby screens show with a retry. The load only errors when there is nothing at all to show.
 - User-added toilets come from the backend (ids prefixed `user-`). Their failure, and review-fetch failure, is non-fatal (logged, treated as empty).
 
 **Pluggable backend: `lib/backend/`.** `Backend` (in `types.ts`) is the storage interface for accounts, reviews, user toilets and photos. `index.ts` picks the implementation at module load:
@@ -47,7 +47,7 @@ Any new persisted feature must be added to the `Backend` interface and implement
 **Supabase schema** is in `supabase/migrations/` (applied manually via the Supabase SQL editor, per README). Tables: `profiles` (auto-created by an `auth.users` trigger with a "Peepal XXXX" nickname), `reviews` (one per user per toilet; saving again replaces it), `user_toilets`, `toilet_photos` (files in the public `toilet-photos` storage bucket under `<user id>/`), `reports` (insert-only for members, no read policy). All have RLS: public read; writes restricted to the owner **and** `public.is_member()` (signed in, not anonymous). Schema changes need a new migration file and matching row mapping in `lib/backend/supabase.ts`.
 
 **Domain logic (pure functions, no React):**
-- `lib/emergency.ts`: "I need to go NOW" pick: excludes paid / customers-only / known-closed; unknown hours count as 1.5x distance.
+- `lib/emergency.ts`: "I need to go NOW" pick: excludes paid / customers-only / known-closed; unknown hours count as 1.5x distance, and each floor away from street level (`Toilet.level`, from OSM) adds 25 m.
 - `lib/openingHours.ts`: minimal OSM `opening_hours` parser. Returns `true`/`false`/`null`; `null` means unknown or too complex, and callers treat it differently from `false`.
 - Tri-state `boolean | null` is used throughout `Toilet` (fee, wheelchair, etc.): `null` = unknown from OSM. Filters require an explicit `true`/`false`, not `null`.
 

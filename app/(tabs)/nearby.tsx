@@ -10,7 +10,7 @@ import { useToilets } from '@/lib/ToiletsContext';
 
 export default function NearbyScreen() {
   const router = useRouter();
-  const { status, visible, allNearby, reviews, refresh } = useToilets();
+  const { status, notice, visible, allNearby, reviews, refresh } = useToilets();
 
   if (status === 'error' && allNearby.length === 0) return <StatusMessage />;
 
@@ -20,6 +20,11 @@ export default function NearbyScreen() {
   return (
     <View style={styles.container}>
       <FilterChips />
+      {notice && (
+        <Text type="footnote" muted style={styles.notice}>
+          {notice} Pull down to try again.
+        </Text>
+      )}
       {firstLoad ? (
         <ToiletListSkeleton />
       ) : (
@@ -40,7 +45,7 @@ export default function NearbyScreen() {
               <Text type="footnote" muted style={styles.count}>
                 {visible.length} toilet{visible.length === 1 ? '' : 's'} within 2 km, nearest first
               </Text>
-            ) : null
+            ) : undefined
           }
           ListEmptyComponent={
             <Text type="callout" muted style={styles.empty}>
@@ -58,5 +63,6 @@ export default function NearbyScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   empty: { textAlign: 'center', padding: 32 },
+  notice: { paddingHorizontal: 16, paddingBottom: 8 },
   count: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
 });

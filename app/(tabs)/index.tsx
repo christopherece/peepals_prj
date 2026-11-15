@@ -20,7 +20,7 @@ export default function MapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const requireMember = useRequireMember();
-  const { location, status, visible, allNearby } = useToilets();
+  const { location, status, error, notice, refresh, visible, allNearby } = useToilets();
   const elevated = useThemeColor({}, 'elevated');
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'onTint');
@@ -62,6 +62,18 @@ export default function MapScreen() {
           <View style={[styles.loading, styles.shadow, { backgroundColor: elevated }]}>
             <ActivityIndicator size="small" />
             <Text type="subhead">Looking for toilets…</Text>
+          </View>
+        )}
+        {location && status !== 'loading' && status !== 'locating' && (error || notice) && (
+          <View style={[styles.problem, styles.shadow, { backgroundColor: elevated }]}>
+            <Text type="subhead" style={styles.problemText}>
+              {status === 'error' ? error : notice}
+            </Text>
+            <PressableScale onPress={refresh} accessibilityRole="button" style={[styles.retry, { backgroundColor: tint }]}>
+              <Text type="subhead" style={{ color: onTint }}>
+                Try again
+              </Text>
+            </PressableScale>
           </View>
         )}
       </View>
@@ -107,6 +119,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
     paddingVertical: Space.sm,
   },
+  problem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    borderRadius: Radius.md,
+    marginHorizontal: Space.lg,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  problemText: { flex: 1 },
+  retry: { borderRadius: Radius.pill, paddingHorizontal: Space.md, paddingVertical: Space.sm },
   fab: {
     position: 'absolute',
     right: Space.lg,

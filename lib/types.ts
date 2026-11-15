@@ -18,6 +18,8 @@ export type Toilet = Coords & {
   /** Raw OpenStreetMap `opening_hours` value, e.g. "Mo-Fr 08:00-18:00" or "24/7". */
   openingHours: string | null;
   source: 'osm' | 'user';
+  /** Floors above (+) or below (-) street level, from OSM `level`. Missing or null = unknown, assumed street level. */
+  level?: number | null;
 };
 
 export type NearbyToilet = Toilet & {

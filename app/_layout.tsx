@@ -16,7 +16,7 @@ export {
 
 export const unstable_settings = {
   // Ensure that reloading on a sheet route keeps the tabs underneath.
-  initialRouteName: '(tabs)',
+  anchor: '(tabs)',
 };
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.

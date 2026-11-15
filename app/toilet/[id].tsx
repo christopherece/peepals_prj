@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import PhotoStrip from '@/components/PhotoStrip';
@@ -27,6 +27,7 @@ export default function ToiletSheet() {
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'onTint');
   const report = useReport();
+  const router = useRouter();
 
   const toilet = allNearby.find((t) => t.id === id);
   if (!toilet) {
@@ -48,7 +49,7 @@ export default function ToiletSheet() {
       {emergency === '1' && (
         <View style={[styles.banner, { backgroundColor: emergencyRed }]}>
           <Text type="headline" style={styles.bannerText}>
-            🚨 Nearest free toilet
+            🚨 {toilet.fee === false ? 'Nearest free toilet' : 'Nearest toilet, probably free'}
           </Text>
           {hoursUnknown && (
             <Text type="footnote" style={styles.bannerText}>
@@ -99,7 +100,7 @@ export default function ToiletSheet() {
               hitSlop={10}
               accessibilityRole="button"
               accessibilityLabel="Report this toilet"
-              onPress={() => report({ kind: 'toilet', id: toilet.id })}>
+              onPress={() => report({ kind: 'toilet', id: toilet.id }, router.back)}>
               <Text type="caption" muted>
                 Report
               </Text>

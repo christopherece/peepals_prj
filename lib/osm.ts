@@ -1,13 +1,18 @@
 import type { Access, Coords, Toilet } from './types';
 
-// Public Overpass instances, tried in order: the main one often answers 429/504 under load.
+// Public Overpass instances, in order of preference. They are community-run and regularly answer
+// 429/502/504 or simply hang, so we don't wait on one at a time (see queryOverpass).
 // Fine for an MVP, but move to our own backend (OSM import into Postgres/PostGIS) before real traffic.
 const OVERPASS_URLS = [
   'https://overpass-api.de/api/interpreter',
+  'https://overpass.openstreetmap.fr/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
 ];
-const REQUEST_TIMEOUT_MS = 10_000;
+/** How long one mirror gets to answer. */
+const REQUEST_TIMEOUT_MS = 20_000;
+/** If a mirror hasn't answered by now, the next one is asked as well. */
+const HEDGE_DELAY_MS = 4_000;
 
 type OsmElement = {
   type: 'node' | 'way' | 'relation';
@@ -24,33 +29,76 @@ export async function fetchNearbyToilets(center: Coords, radiusMeters = 2000): P
   return json.elements.map(toToilet).filter((t): t is Toilet => t !== null);
 }
 
-async function queryOverpass(query: string): Promise<{ elements: OsmElement[] }> {
-  let lastError: unknown;
-  for (const url of OVERPASS_URLS) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Accept: 'application/json',
-          // Overpass rejects generic client user agents with a 406.
-          'User-Agent': 'Peepals/0.1 (toilet finder app)',
+type OverpassResponse = { elements: OsmElement[] };
+
+/**
+ * Asks the mirrors in order, moving on as soon as one fails or after HEDGE_DELAY_MS without an answer.
+ * The first good answer wins and the rest are cancelled.
+ */
+function queryOverpass(query: string): Promise<OverpassResponse> {
+  return new Promise((resolve, reject) => {
+    const controllers: AbortController[] = [];
+    let started = 0;
+    let failed = 0;
+    let settled = false;
+    let hedge: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = (result: OverpassResponse | null) => {
+      settled = true;
+      clearTimeout(hedge);
+      controllers.forEach((c) => c.abort());
+      if (result) resolve(result);
+      else reject(new Error("Couldn't load toilets: the map data servers are busy. Try again in a moment."));
+    };
+
+    const startNext = () => {
+      if (settled || started >= OVERPASS_URLS.length) return;
+      const url = OVERPASS_URLS[started++];
+      clearTimeout(hedge);
+      hedge = setTimeout(startNext, HEDGE_DELAY_MS);
+
+      const controller = new AbortController();
+      controllers.push(controller);
+      queryMirror(url, query, controller).then(
+        (json) => {
+          if (!settled) finish(json);
         },
-        body: 'data=' + encodeURIComponent(query),
-        signal: controller.signal,
-      });
-      if (res.ok) return await res.json();
-      lastError = new Error(`Overpass ${res.status}`);
-    } catch (e) {
-      lastError = e;
-    } finally {
-      clearTimeout(timer);
-    }
-    console.warn(`Overpass mirror failed (${url}):`, lastError);
+        (e) => {
+          if (settled) return;
+          console.warn(`Overpass mirror failed (${url}):`, e);
+          failed++;
+          if (failed === OVERPASS_URLS.length) finish(null);
+          else if (failed === started) startNext();
+        }
+      );
+    };
+
+    startNext();
+  });
+}
+
+async function queryMirror(url: string, query: string, controller: AbortController): Promise<OverpassResponse> {
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+        // Overpass rejects generic client user agents with a 406.
+        'User-Agent': 'Peepals/1.0 (toilet finder app)',
+      },
+      body: 'data=' + encodeURIComponent(query),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Overpass ${res.status}`);
+    const json = await res.json();
+    // An overloaded server can answer 200 with an error body instead of results.
+    if (!Array.isArray(json?.elements)) throw new Error('Overpass sent no results');
+    return json;
+  } finally {
+    clearTimeout(timer);
   }
-  throw new Error("Couldn't load toilets: the map data servers are busy. Try again in a moment.");
 }
 
 function toToilet(el: OsmElement): Toilet | null {
@@ -73,6 +121,7 @@ function toToilet(el: OsmElement): Toilet | null {
     genderNeutral: tags.unisex === 'yes' || tags.gender_segregated === 'no' ? true : yesNo(tags.unisex),
     openingHours: tags.opening_hours ?? null,
     source: 'osm',
+    level: toLevel(tags.level),
   };
 }
 
@@ -85,6 +134,12 @@ function toiletName(tags: Record<string, string>): string {
   if (tags.level && tags.level !== '0') return `Toilets, level ${tags.level}`;
   if (tags.access === 'customers') return 'Customer toilets';
   return 'Public toilets';
+}
+
+/** "50" → 50, "-1 (below ground level)" → -1, "0,1,2" → 0. */
+function toLevel(value: string | undefined): number | null {
+  const level = Number.parseFloat(value ?? '');
+  return Number.isFinite(level) ? level : null;
 }
 
 function yesNo(value: string | undefined): boolean | null {

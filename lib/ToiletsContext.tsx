@@ -3,9 +3,10 @@ import * as Location from 'expo-location';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { backend } from './backend';
-import { distanceMeters } from './format';
+import { distanceMeters, formatAgo } from './format';
 import { isOpenNow } from './openingHours';
 import { fetchNearbyToilets } from './osm';
+import { loadToiletCache, saveToiletCache } from './toiletCache';
 import {
   NO_FILTERS,
   type Coords,
@@ -32,6 +33,8 @@ type ToiletsContextValue = {
   location: Coords | null;
   status: Status;
   error: string | null;
+  /** Set when the list on screen is a saved copy because fresh data couldn't be loaded. */
+  notice: string | null;
   /** Every known toilet, nearest first. Emergency mode uses this and ignores filters. */
   allNearby: NearbyToilet[];
   /** `allNearby` with the user's filters applied. */
@@ -89,6 +92,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
   const [location, setLocation] = useState<Coords | null>(null);
   const [status, setStatus] = useState<Status>('locating');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [osmToilets, setOsmToilets] = useState<Toilet[]>([]);
   const [userToilets, setUserToilets] = useState<Toilet[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -118,13 +122,30 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
 
       setStatus('loading');
       // OSM is the main source; user-added toilets are a bonus, so their failure isn't fatal.
-      const [osm, added] = await Promise.all([
-        fetchNearbyToilets(coords, SEARCH_RADIUS_METERS),
+      const [fresh, added] = await Promise.all([
+        fetchNearbyToilets(coords, SEARCH_RADIUS_METERS).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e)))),
         backend.fetchUserToilets(coords, SEARCH_RADIUS_METERS).catch((e) => {
           console.warn(e);
           return [];
         }),
       ]);
+
+      let osm: Toilet[];
+      if (fresh instanceof Error) {
+        // The data servers are down: fall back to what we loaded here last time, if anything.
+        const cached = await loadToiletCache(coords);
+        if (!cached && added.length === 0) throw fresh;
+        osm = cached?.toilets ?? [];
+        setNotice(
+          cached
+            ? `Couldn't refresh, so these are from ${formatAgo(cached.savedAt)}. Hours and details may have changed.`
+            : "Couldn't load the public toilet map, so only toilets added by Peepals are shown."
+        );
+      } else {
+        osm = fresh;
+        setNotice(null);
+        saveToiletCache(coords, fresh);
+      }
       setOsmToilets(osm);
       setUserToilets(added);
       setStatus('ready');
@@ -256,6 +277,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       location,
       status,
       error,
+      notice,
       allNearby,
       visible,
       reviews: visibleReviews,
@@ -279,6 +301,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       location,
       status,
       error,
+      notice,
       allNearby,
       visible,
       visibleReviews,
