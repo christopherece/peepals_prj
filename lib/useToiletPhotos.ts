@@ -1,8 +1,8 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { backend } from './backend';
-import { useToilets } from './ToiletsContext';
+import { hiddenKey, useToilets } from './ToiletsContext';
 import type { Photo, PickedPhoto } from './types';
 
 export type PhotoSource = 'camera' | 'library';
@@ -35,8 +35,8 @@ export async function pickPhoto(source: PhotoSource): Promise<PickedPhoto | null
 
 /** Photos of one toilet, plus an upload action. Callers gate `upload` with `useRequireMember`. */
 export function useToiletPhotos(toiletId: string) {
-  const { profile } = useToilets();
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  const { profile, hidden } = useToilets();
+  const [allPhotos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
@@ -69,6 +69,12 @@ export function useToiletPhotos(toiletId: string) {
       }
     },
     [profile, toiletId]
+  );
+
+  // Photos this user reported stay hidden for them.
+  const photos = useMemo(
+    () => allPhotos.filter((p) => !hidden.has(hiddenKey({ kind: 'photo', id: p.id }))),
+    [allPhotos, hidden]
   );
 
   return { photos, loading, uploading, upload };

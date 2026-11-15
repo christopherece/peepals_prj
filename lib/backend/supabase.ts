@@ -144,6 +144,34 @@ export function createSupabaseBackend(supabase: SupabaseClient): Backend {
       return { ...data, email: profile.email };
     },
 
+    async deleteAccount(profile) {
+      // Photo files first: the database cascade removes rows, not files in storage.
+      const { data: photos, error: listError } = await supabase
+        .from('toilet_photos')
+        .select('path')
+        .eq('user_id', profile.id)
+        .returns<{ path: string }[]>();
+      if (listError) throw new Error(`Couldn't delete your account: ${listError.message}`);
+      if (photos.length > 0) {
+        const removal = await supabase.storage.from(PHOTO_BUCKET).remove(photos.map((p) => p.path));
+        if (removal.error) throw new Error(`Couldn't delete your photos: ${removal.error.message}`);
+      }
+
+      // Deletes the auth user; profile, reviews, photos and added toilets cascade from it.
+      const { error } = await supabase.rpc('delete_account');
+      if (error) throw new Error(`Couldn't delete your account: ${error.message}`);
+      // The server-side session is already gone, so only clear this device.
+      await supabase.auth.signOut({ scope: 'local' });
+    },
+
+    async report(profile, target, reason) {
+      const { error } = await supabase
+        .from('reports')
+        .insert({ reporter_id: profile.id, target_kind: target.kind, target_id: target.id, reason });
+      // 23505 = this member already reported it.
+      if (error && error.code !== '23505') throw new Error(`Couldn't send the report: ${error.message}`);
+    },
+
     async fetchReviews(toiletIds) {
       const chunks: string[][] = [];
       for (let i = 0; i < toiletIds.length; i += IDS_PER_REQUEST) {

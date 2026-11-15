@@ -14,6 +14,7 @@ import { isOpenNow } from '@/lib/openingHours';
 import { toiletStatus } from '@/lib/status';
 import { useToilets } from '@/lib/ToiletsContext';
 import type { Toilet } from '@/lib/types';
+import { useReport } from '@/lib/useReport';
 
 /**
  * Toilet details, shown as a bottom sheet over the map (see app/_layout.tsx).
@@ -25,6 +26,7 @@ export default function ToiletSheet() {
   const card = useThemeColor({}, 'card');
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'onTint');
+  const report = useReport();
 
   const toilet = allNearby.find((t) => t.id === id);
   if (!toilet) {
@@ -87,9 +89,23 @@ export default function ToiletSheet() {
         <InfoRow label="Wheelchair accessible" value={yesNoLabel(toilet.wheelchair)} />
         <InfoRow label="Changing table" value={yesNoLabel(toilet.changingTable)} />
         <InfoRow label="Gender-neutral" value={yesNoLabel(toilet.genderNeutral)} />
-        <Text type="caption" muted>
-          {toilet.source === 'osm' ? 'Data © OpenStreetMap contributors' : 'Added by a Peepal'}
-        </Text>
+        <View style={styles.infoRow}>
+          <Text type="caption" muted>
+            {toilet.source === 'osm' ? 'Data © OpenStreetMap contributors' : 'Added by a Peepal'}
+          </Text>
+          {toilet.source === 'user' && (
+            <PressableScale
+              haptic={false}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Report this toilet"
+              onPress={() => report({ kind: 'toilet', id: toilet.id })}>
+              <Text type="caption" muted>
+                Report
+              </Text>
+            </PressableScale>
+          )}
+        </View>
       </View>
 
       <ReviewSection toiletId={toilet.id} />

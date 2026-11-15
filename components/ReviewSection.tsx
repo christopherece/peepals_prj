@@ -9,6 +9,7 @@ import { Radius, Space } from '@/constants/Typography';
 import { formatAgo, ratingSummary } from '@/lib/format';
 import { useToilets } from '@/lib/ToiletsContext';
 import type { Review } from '@/lib/types';
+import { useReport } from '@/lib/useReport';
 import { useRequireMember } from '@/lib/useRequireMember';
 
 /** Rating summary, the review form, and the community tip feed for one toilet. */
@@ -55,6 +56,8 @@ function ReviewItem({ review }: { review: Review }) {
   const card = useThemeColor({}, 'card');
   const tint = useThemeColor({}, 'tint');
   const onTint = useThemeColor({}, 'onTint');
+  const { profile } = useToilets();
+  const report = useReport();
   const average = (review.cleanliness + review.safety + review.wait) / 3;
 
   return (
@@ -76,9 +79,23 @@ function ReviewItem({ review }: { review: Review }) {
         <Stars value={average} size={14} label={`Rated ${average.toFixed(1)} of 5`} />
       </View>
       {review.comment ? <Text type="body">{review.comment}</Text> : null}
-      <Text type="caption" muted>
-        Clean {review.cleanliness}/5 · Safe {review.safety}/5 · Wait {review.wait}/5
-      </Text>
+      <View style={styles.itemFooter}>
+        <Text type="caption" muted>
+          Clean {review.cleanliness}/5 · Safe {review.safety}/5 · Wait {review.wait}/5
+        </Text>
+        {review.userId !== profile?.id && (
+          <PressableScale
+            haptic={false}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={`Report review by ${review.author}`}
+            onPress={() => report({ kind: 'review', id: review.id })}>
+            <Text type="caption" muted>
+              Report
+            </Text>
+          </PressableScale>
+        )}
+      </View>
     </View>
   );
 }
@@ -206,6 +223,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: Radius.md, padding: Space.lg, gap: Space.sm },
   itemHeader: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   itemTitle: { flex: 1 },
+  itemFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
   avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   ratingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   input: { borderRadius: Radius.sm, padding: Space.md, fontSize: 15, minHeight: 64, textAlignVertical: 'top' },

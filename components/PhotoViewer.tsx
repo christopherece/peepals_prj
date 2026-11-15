@@ -4,7 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { formatAgo } from '@/lib/format';
+import { useToilets } from '@/lib/ToiletsContext';
 import type { Photo } from '@/lib/types';
+import { useReport } from '@/lib/useReport';
 
 type Props = {
   photos: Photo[];
@@ -17,6 +19,8 @@ type Props = {
 export default function PhotoViewer({ photos, index, onClose }: Props) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { profile } = useToilets();
+  const report = useReport();
 
   return (
     <Modal visible={index !== null} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -32,9 +36,26 @@ export default function PhotoViewer({ photos, index, onClose }: Props) {
           renderItem={({ item }) => (
             <View style={{ width, height }}>
               <Image source={{ uri: item.url }} style={StyleSheet.absoluteFill} contentFit="contain" />
-              <Text type="footnote" style={[styles.caption, { bottom: insets.bottom + 24 }]}>
-                Added {formatAgo(item.createdAt)}
-              </Text>
+              <View style={[styles.caption, { bottom: insets.bottom + 24 }]}>
+                <Text type="footnote" style={styles.captionText}>
+                  Added {formatAgo(item.createdAt)}
+                </Text>
+                {item.userId !== profile?.id && (
+                  // Close first: the sign-in sheet and alerts can't show over this modal.
+                  <Pressable
+                    hitSlop={12}
+                    accessibilityRole="button"
+                    accessibilityLabel="Report this photo"
+                    onPress={() => {
+                      onClose();
+                      report({ kind: 'photo', id: item.id });
+                    }}>
+                    <Text type="footnote" style={[styles.captionText, styles.report]}>
+                      Report
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
           )}
         />
@@ -55,7 +76,9 @@ export default function PhotoViewer({ photos, index, onClose }: Props) {
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: '#000' },
-  caption: { position: 'absolute', alignSelf: 'center', color: '#fff', opacity: 0.8 },
+  caption: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', gap: 16 },
+  captionText: { color: '#fff', opacity: 0.8 },
+  report: { textDecorationLine: 'underline' },
   close: {
     position: 'absolute',
     right: 16,

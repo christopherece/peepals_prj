@@ -69,6 +69,12 @@ export type Review = {
   createdAt: number;
 };
 
+/** Something a member flags as offensive, spam or wrong. `id` is the review, photo or toilet id. */
+export type ReportTarget = {
+  kind: 'review' | 'photo' | 'toilet';
+  id: string;
+};
+
 export type NewReview = Pick<Review, 'toiletId' | 'cleanliness' | 'safety' | 'wait' | 'comment'>;
 
 export type NewToilet = Omit<Toilet, 'id' | 'source'>;

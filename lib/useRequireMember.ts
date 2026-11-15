@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { useToilets } from './ToiletsContext';
 
 /** What the guest was trying to do; shown on the sign-in sheet. */
-export type MemberAction = 'review' | 'add-toilet' | 'photo' | 'profile';
+export type MemberAction = 'review' | 'add-toilet' | 'photo' | 'profile' | 'report';
 
 /**
  * Returns a guard for contribution actions. Members pass straight through (`true`).

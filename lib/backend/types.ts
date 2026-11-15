@@ -1,4 +1,4 @@
-import type { Coords, NewReview, NewToilet, Photo, PickedPhoto, Profile, Review, SignInMethod, Toilet } from '../types';
+import type { Coords, NewReview, NewToilet, Photo, PickedPhoto, Profile, ReportTarget, Review, SignInMethod, Toilet } from '../types';
 
 /**
  * Where reviews, user-added toilets, photos and accounts are stored.
@@ -17,6 +17,10 @@ export type Backend = {
   signIn(method: SignInMethod): Promise<Profile>;
   signOut(): Promise<void>;
   updateNickname(profile: Profile, nickname: string): Promise<Profile>;
+  /** Permanently removes the account and everything it posted (reviews, photos, added toilets). */
+  deleteAccount(profile: Profile): Promise<void>;
+  /** Flags content for moderation. Reporting the same thing twice is fine. */
+  report(profile: Profile, target: ReportTarget, reason: string): Promise<void>;
 
   fetchReviews(toiletIds: string[]): Promise<Review[]>;
   /** Creates or replaces the user's review for that toilet. */

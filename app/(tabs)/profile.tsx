@@ -32,6 +32,7 @@ export default function ProfileScreen() {
             </Text>
           </View>
           <SignOutButton />
+          <DeleteAccountButton />
         </>
       ) : (
         <GuestCard />
@@ -162,6 +163,43 @@ function SignOutButton() {
     <PressableScale haptic={false} onPress={confirm} style={styles.signOut}>
       <Text type="headline" style={{ color: danger }}>
         Sign out
+      </Text>
+    </PressableScale>
+  );
+}
+
+function DeleteAccountButton() {
+  const { deleteAccount, shared } = useToilets();
+  const [deleting, setDeleting] = useState(false);
+
+  const run = async () => {
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      Alert.alert('Account deleted', 'Everything you posted is gone. You can keep browsing as a guest.');
+    } catch (e) {
+      Alert.alert('Account not deleted', e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const confirm = () =>
+    Alert.alert(
+      'Delete your account?',
+      shared
+        ? 'This permanently deletes your profile, reviews, photos and the toilets you added. It can’t be undone.'
+        : 'This permanently deletes your profile, reviews, photos and added toilets from this phone. It can’t be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete account', style: 'destructive', onPress: run },
+      ]
+    );
+
+  return (
+    <PressableScale haptic={false} disabled={deleting} onPress={confirm} style={styles.signOut}>
+      <Text type="footnote" muted>
+        {deleting ? 'Deleting…' : 'Delete account'}
       </Text>
     </PressableScale>
   );

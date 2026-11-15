@@ -20,6 +20,8 @@ npx expo lint       # lint (eslint-config-expo)
 npx tsc --noEmit    # typecheck
 ```
 
+Release builds use EAS (`eas.json`; steps in README "Ship it"). `app.config.ts` extends `app.json` to add the `react-native-maps` plugin when `GOOGLE_MAPS_API_KEY` is set (Android needs it outside Expo Go). `EXPO_PUBLIC_SUPABASE_*` must be set as EAS environment variables, since `.env.local` is not uploaded.
+
 There is no test runner or test suite. Run lint and typecheck before declaring work done.
 
 The map (`react-native-maps`) only works on iOS/Android; `components/ToiletMap.web.tsx` is a placeholder, so the web build is only for quick UI checks.
@@ -38,9 +40,11 @@ The map (`react-native-maps`) only works on iOS/Android; `components/ToiletMap.w
 - `supabase.ts` if `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are set (in `.env.local`, git-ignored). Sign-in is email only: `signInWithOtp` sends a 6-digit code, `verifyOtp` checks it. Anonymous sessions left over from older versions count as guests. The client in `lib/supabase.ts` persists sessions via `expo-sqlite` localStorage.
 - `local.ts` otherwise ("offline mode"): AsyncStorage on the device, fixed `local-user` id. There are no real accounts: "signing in" saves an email + nickname device profile (nothing is sent), and photos are copied into the app's documents folder. Its `fetchUserToilets` ignores the radius and returns every toilet the user has added.
 
+Both also implement `deleteAccount` (Profile tab; Supabase calls the `delete_account()` RPC after removing the member's photo files) and `report` (inserts into the write-only `reports` table; a no-op offline). Reported content is hidden on the reporter's device via `hidden` in the context (AsyncStorage `peepals:hidden`); start reports with `useReport()` (`lib/useReport.ts`). The local backend stores photo **file names**, not absolute URIs, because iOS moves the app container on every update.
+
 Any new persisted feature must be added to the `Backend` interface and implemented in **both** backends. `backend.shared` tells the UI which mode it's in (shown on the Profile tab).
 
-**Supabase schema** is in `supabase/migrations/` (applied manually via the Supabase SQL editor, per README). Tables: `profiles` (auto-created by an `auth.users` trigger with a "Peepal XXXX" nickname), `reviews` (one per user per toilet; saving again replaces it), `user_toilets`, `toilet_photos` (files in the public `toilet-photos` storage bucket under `<user id>/`). All have RLS: public read; writes restricted to the owner **and** `public.is_member()` (signed in, not anonymous). Schema changes need a new migration file and matching row mapping in `lib/backend/supabase.ts`.
+**Supabase schema** is in `supabase/migrations/` (applied manually via the Supabase SQL editor, per README). Tables: `profiles` (auto-created by an `auth.users` trigger with a "Peepal XXXX" nickname), `reviews` (one per user per toilet; saving again replaces it), `user_toilets`, `toilet_photos` (files in the public `toilet-photos` storage bucket under `<user id>/`), `reports` (insert-only for members, no read policy). All have RLS: public read; writes restricted to the owner **and** `public.is_member()` (signed in, not anonymous). Schema changes need a new migration file and matching row mapping in `lib/backend/supabase.ts`.
 
 **Domain logic (pure functions, no React):**
 - `lib/emergency.ts`: "I need to go NOW" pick: excludes paid / customers-only / known-closed; unknown hours count as 1.5x distance.

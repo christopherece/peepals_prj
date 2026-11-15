@@ -25,6 +25,17 @@ function newId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Folder inside the app's documents directory where offline photos are kept. */
+const PHOTO_DIR = 'photos';
+
+/**
+ * Photos are stored by file name, not full path: iOS moves the app's container on every update,
+ * so an absolute file:// URI saved today points nowhere tomorrow.
+ */
+function photoFile(stored: string): File {
+  return new File(Paths.document, PHOTO_DIR, stored.split('/').pop() ?? stored);
+}
+
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
@@ -66,6 +77,25 @@ export const localBackend: Backend = {
     return updated;
   },
 
+  async deleteAccount(profile) {
+    const photos = await read<Photo[]>(PHOTOS_KEY, []);
+    for (const photo of photos) {
+      const file = photoFile(photo.url);
+      if (file.exists) file.delete();
+    }
+    const reviews = await read<Review[]>(REVIEWS_KEY, []);
+    await write(
+      REVIEWS_KEY,
+      reviews.filter((r) => r.userId !== profile.id)
+    );
+    await AsyncStorage.multiRemove([PROFILE_KEY, USER_TOILETS_KEY, PHOTOS_KEY]);
+    notify();
+  },
+
+  async report() {
+    // Nothing to send in offline mode: the app hides reported content on this device.
+  },
+
   async fetchReviews(toiletIds) {
     const ids = new Set(toiletIds);
     const all = await read<Review[]>(REVIEWS_KEY, []);
@@ -99,20 +129,21 @@ export const localBackend: Backend = {
 
   async fetchPhotos(toiletId) {
     const all = await read<Photo[]>(PHOTOS_KEY, []);
-    return all.filter((p) => p.toiletId === toiletId);
+    return all.filter((p) => p.toiletId === toiletId).map((p) => ({ ...p, url: photoFile(p.url).uri }));
   },
 
   async addPhoto(profile, toiletId, picked) {
     // Picker results live in a cache folder the OS may clear, so keep our own copy.
-    const dir = new Directory(Paths.document, 'photos');
+    const dir = new Directory(Paths.document, PHOTO_DIR);
     if (!dir.exists) dir.create({ intermediates: true });
     const id = newId('photo');
-    const destination = new File(dir, `${id}.${picked.mimeType === 'image/png' ? 'png' : 'jpg'}`);
+    const fileName = `${id}.${picked.mimeType === 'image/png' ? 'png' : 'jpg'}`;
+    const destination = new File(dir, fileName);
     await new File(picked.uri).copy(destination);
 
-    const photo: Photo = { id, toiletId, userId: profile.id, url: destination.uri, createdAt: Date.now() };
+    const photo: Photo = { id, toiletId, userId: profile.id, url: fileName, createdAt: Date.now() };
     const all = await read<Photo[]>(PHOTOS_KEY, []);
     await write(PHOTOS_KEY, [photo, ...all]);
-    return photo;
+    return { ...photo, url: destination.uri };
   },
 };

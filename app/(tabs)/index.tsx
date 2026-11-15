@@ -32,7 +32,7 @@ export default function MapScreen() {
     if (!best) {
       Alert.alert(
         'No free toilet found nearby',
-        'Try a café or shopping mall, or turn off filters in the Nearby tab to see paid and customers-only options.'
+        'Try a café, station or shopping mall, or check the Nearby tab for paid and customers-only options.'
       );
       return;
     }

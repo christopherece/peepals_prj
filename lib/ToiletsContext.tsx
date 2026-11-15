@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
@@ -13,12 +14,17 @@ import {
   type NewReview,
   type NewToilet,
   type Profile,
+  type ReportTarget,
   type Review,
   type SignInMethod,
   type Toilet,
 } from './types';
 
 const SEARCH_RADIUS_METERS = 2000;
+/** Content this device's user reported, hidden for them from then on. */
+const HIDDEN_KEY = 'peepals:hidden';
+
+export const hiddenKey = (target: ReportTarget) => `${target.kind}:${target.id}`;
 
 type Status = 'locating' | 'loading' | 'ready' | 'error';
 
@@ -47,6 +53,12 @@ type ToiletsContextValue = {
   addReview: (review: NewReview) => Promise<void>;
   addToilet: (toilet: NewToilet) => Promise<Toilet>;
   updateNickname: (nickname: string) => Promise<void>;
+  /** Permanently deletes the member's account and everything they posted, then signs out. */
+  deleteAccount: () => Promise<void>;
+  /** Flags a review, photo or toilet for moderation and hides it on this device. */
+  reportContent: (target: ReportTarget, reason: string) => Promise<void>;
+  /** `hiddenKey(target)` of everything this user reported; `reviews` and `allNearby` already leave these out. */
+  hidden: ReadonlySet<string>;
 };
 
 const POSITION_TIMEOUT_MS = 15_000;
@@ -83,6 +95,14 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+
+  useEffect(() => {
+    AsyncStorage.getItem(HIDDEN_KEY).then(
+      (raw) => raw && setHidden(new Set(JSON.parse(raw) as string[])),
+      (e) => console.warn(e)
+    );
+  }, []);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -138,9 +158,15 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
 
   const allNearby = useMemo<NearbyToilet[]>(() => {
     return [...userToilets, ...osmToilets]
+      .filter((t) => !hidden.has(hiddenKey({ kind: 'toilet', id: t.id })))
       .map((t) => ({ ...t, distance: location ? distanceMeters(location, t) : null }))
       .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
-  }, [userToilets, osmToilets, location]);
+  }, [userToilets, osmToilets, location, hidden]);
+
+  const visibleReviews = useMemo(
+    () => reviews.filter((r) => !hidden.has(hiddenKey({ kind: 'review', id: r.id }))),
+    [reviews, hidden]
+  );
 
   const visible = useMemo(() => {
     const now = new Date();
@@ -199,6 +225,32 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
     [requireProfile]
   );
 
+  const deleteAccount = useCallback(async () => {
+    const member = await requireProfile();
+    await backend.deleteAccount(member);
+    setProfile(null);
+    // Their reviews and toilets are gone from the backend; drop them from the screen too.
+    setReviews((prev) => prev.filter((r) => r.userId !== member.id));
+    if (location) {
+      setUserToilets(
+        await backend.fetchUserToilets(location, SEARCH_RADIUS_METERS).catch((e) => {
+          console.warn(e);
+          return [];
+        })
+      );
+    }
+  }, [requireProfile, location]);
+
+  const reportContent = useCallback(
+    async (target: ReportTarget, reason: string) => {
+      await backend.report(await requireProfile(), target, reason);
+      const next = new Set(hidden).add(hiddenKey(target));
+      setHidden(next);
+      await AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...next])).catch((e) => console.warn(e));
+    },
+    [requireProfile, hidden]
+  );
+
   const value = useMemo(
     () => ({
       location,
@@ -206,7 +258,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       error,
       allNearby,
       visible,
-      reviews,
+      reviews: visibleReviews,
       filters,
       setFilters,
       refresh,
@@ -219,6 +271,9 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       addReview,
       addToilet,
       updateNickname,
+      deleteAccount,
+      reportContent,
+      hidden,
     }),
     [
       location,
@@ -226,7 +281,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       error,
       allNearby,
       visible,
-      reviews,
+      visibleReviews,
       filters,
       refresh,
       profile,
@@ -236,6 +291,9 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       addReview,
       addToilet,
       updateNickname,
+      deleteAccount,
+      reportContent,
+      hidden,
     ]
   );
 

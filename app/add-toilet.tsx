@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
@@ -8,6 +9,25 @@ import SheetGrabber from '@/components/SheetGrabber';
 import { Text, useThemeColor } from '@/components/Themed';
 import { Radius, Space } from '@/constants/Typography';
 import { useToilets } from '@/lib/ToiletsContext';
+import type { Coords } from '@/lib/types';
+
+const FRESH_FIX_TIMEOUT_MS = 5000;
+
+/**
+ * Where the user is standing right now. The map's location is from the last load, which can be
+ * minutes and blocks old; fall back to it if a fresh fix doesn't arrive quickly.
+ */
+async function currentSpot(fallback: Coords): Promise<Coords> {
+  try {
+    const { coords } = await Promise.race([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), FRESH_FIX_TIMEOUT_MS)),
+    ]);
+    return { latitude: coords.latitude, longitude: coords.longitude };
+  } catch {
+    return fallback;
+  }
+}
 
 /** "Add missing spot" sheet. Opened from the map's + button, members only (see useRequireMember). */
 export default function AddToiletSheet() {
@@ -38,7 +58,7 @@ export default function AddToiletSheet() {
     try {
       // Unchecked switches mean "don't know" rather than "no".
       const toilet = await addToilet({
-        ...location,
+        ...(await currentSpot(location)),
         name: name.trim() || 'Public toilet',
         fee: free ? false : null,
         access: customersOnly ? 'customers' : 'public',

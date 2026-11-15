@@ -16,6 +16,7 @@ const ACTION_COPY: Record<MemberAction, string> = {
   'add-toilet': 'Sign in to add a missing toilet.',
   photo: 'Sign in to share a photo.',
   profile: 'Sign in to start contributing.',
+  report: 'Sign in to report something.',
 };
 
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -162,6 +163,10 @@ export default function SignInSheet() {
             No password needed. New here? The code creates your account.
           </Text>
         )}
+        <Text type="caption" muted style={styles.center}>
+          By joining you agree to keep it friendly: no abusive, explicit or misleading posts, and no people in
+          photos. Reported content gets removed.
+        </Text>
       </>
     );
   }
