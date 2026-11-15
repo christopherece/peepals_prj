@@ -47,6 +47,14 @@ const USER_TOILET_PREFIX = 'user-';
 const PHOTO_BUCKET = 'toilet-photos';
 const PHOTO_COLUMNS = 'id, toilet_id, user_id, path, created_at';
 
+/**
+ * App Store and Google Play reviewers can't receive our sign-in emails. For this one address no code is
+ * sent, and the "code" they type is checked as the account's password instead (set it in the Supabase
+ * dashboard; give both to the stores in the review notes). Unset = feature off.
+ */
+const REVIEW_EMAIL = process.env.EXPO_PUBLIC_REVIEW_EMAIL?.trim().toLowerCase() || null;
+const isReviewAccount = (email: string) => REVIEW_EMAIL !== null && email.trim().toLowerCase() === REVIEW_EMAIL;
+
 function toReview(row: ReviewRow): Review {
   return {
     id: row.id,
@@ -116,12 +124,18 @@ export function createSupabaseBackend(supabase: SupabaseClient): Backend {
     },
 
     async sendEmailCode(email) {
+      if (isReviewAccount(email)) return;
       const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
       if (error) throw new Error(`Couldn't send the code: ${error.message}`);
     },
 
     async signIn(method) {
       if (method.kind !== 'email-code') throw new Error('Device profiles are only for offline mode.');
+      if (isReviewAccount(method.email)) {
+        const review = await supabase.auth.signInWithPassword({ email: method.email, password: method.code });
+        if (review.error) throw new Error(`That code didn't work: ${review.error.message}`);
+        return loadProfile(review.data.user);
+      }
       const { data, error } = await supabase.auth.verifyOtp({ email: method.email, token: method.code, type: 'email' });
       if (error) throw new Error(`That code didn't work: ${error.message}`);
       if (!data.user) throw new Error("Couldn't sign in.");

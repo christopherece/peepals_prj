@@ -61,6 +61,14 @@ You need an Expo account, an Apple Developer account (99 USD/year) and a Google 
    `npx eas-cli@latest submit --profile production --platform all`. The very first Android upload has to be
    done by hand in Play Console; after that `submit` works.
 
+**Sign-in for app reviewers.** Apple and Google reviewers can't receive the emailed code, so give them a fixed one:
+1. Supabase → **Authentication → Users → Add user → Create new user**: an address like `review@yourdomain.com`,
+   a 6-digit **password** (e.g. `482916`), and tick **Auto Confirm User**.
+2. `npx eas-cli@latest env:set --environment production --visibility plaintext --name EXPO_PUBLIC_REVIEW_EMAIL --value review@yourdomain.com`
+3. In App Store Connect (**App Review Information**) and Play Console (**App content → App access**), give the
+   address and say: "Enter this email, tap Email me a code, then enter 482916 as the code."
+   For that one address no email is sent and the code is checked as its password.
+
 Both stores also ask for things that live outside this repo: a **privacy policy URL** (the app collects email,
 location and photos), a **support contact**, the data-safety / privacy-label forms, and for Google Play a
 **web page where people can request account deletion** (the in-app "Delete account" on the Profile tab covers Apple).

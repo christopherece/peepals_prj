@@ -33,6 +33,8 @@ type ToiletsContextValue = {
   location: Coords | null;
   status: Status;
   error: string | null;
+  /** true when location was refused and only the system Settings app can turn it back on. */
+  needsSettings: boolean;
   /** Set when the list on screen is a saved copy because fresh data couldn't be loaded. */
   notice: string | null;
   /** Every known toilet, nearest first. Emergency mode uses this and ignores filters. */
@@ -92,6 +94,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
   const [location, setLocation] = useState<Coords | null>(null);
   const [status, setStatus] = useState<Status>('locating');
   const [error, setError] = useState<string | null>(null);
+  const [needsSettings, setNeedsSettings] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [osmToilets, setOsmToilets] = useState<Toilet[]>([]);
   const [userToilets, setUserToilets] = useState<Toilet[]>([]);
@@ -113,8 +116,13 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
     setStatus('locating');
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
+      setNeedsSettings(permission.status !== 'granted' && !permission.canAskAgain);
       if (permission.status !== 'granted') {
-        throw new Error('Peepals needs your location to find toilets near you.');
+        throw new Error(
+          permission.canAskAgain
+            ? 'Peepals needs your location to find toilets near you.'
+            : 'Location is off for Peepals. Turn it on in Settings to see toilets near you.'
+        );
       }
       const position = await getPosition();
       const coords = { latitude: position.coords.latitude, longitude: position.coords.longitude };
@@ -277,6 +285,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       location,
       status,
       error,
+      needsSettings,
       notice,
       allNearby,
       visible,
@@ -301,6 +310,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       location,
       status,
       error,
+      needsSettings,
       notice,
       allNearby,
       visible,
