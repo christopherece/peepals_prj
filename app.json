@@ -100,6 +100,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "165b0568-ec63-46fc-8781-69161984ed8f"
+      }
+    },
+    "owner": "meztroinhinyeroelektronico"
   }
 }
