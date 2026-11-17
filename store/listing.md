@@ -1,7 +1,7 @@
 # Store listing: Peepals
 
 Copy-paste text and form answers for App Store Connect and Google Play Console.
-Replace `REPLACE-WITH-CONTACT-EMAIL` (here and in `docs/`) and `REVIEW-EMAIL` / `REVIEW-CODE` first.
+The reviewer code is deliberately not stored here (public repo): type it into App Store Connect and Play Console only.
 
 ## URLs (after GitHub Pages is on: repo Settings → Pages → Deploy from branch → `main`, folder `/docs`)
 
@@ -43,8 +43,8 @@ Apple (App Review Information → Sign-in required: yes) and Google (App content
 > Browsing, filters, directions and the "I need to go NOW" button work without signing in.
 > To test reviews, photos, adding a toilet, reporting content and account deletion, sign in:
 > 1. Profile tab → "Join the Peepals community"
-> 2. Email: REVIEW-EMAIL → tap "Email me a code"
-> 3. Code: REVIEW-CODE (no email is sent for this test account)
+> 2. Email: chris.ancheta@topitsolutions.co.nz → tap "Email me a code"
+> 3. Code: [6-digit code, entered in the store console only] (no email is sent for this test account)
 > Account deletion: Profile tab → "Delete account". Reporting: the "Report" link on any review or photo by another user.
 > Location: the app needs location to show nearby toilets. In the simulator, set a location such as Apple Park.
 
