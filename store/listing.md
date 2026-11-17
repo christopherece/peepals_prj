@@ -10,7 +10,7 @@ Replace `REPLACE-WITH-CONTACT-EMAIL` (here and in `docs/`) and `REVIEW-EMAIL` / 
 | Privacy policy | https://christopherece.github.io/peepals_prj/privacy.html |
 | Account deletion (Google Play) | https://christopherece.github.io/peepals_prj/delete-account.html |
 | Support / marketing | https://christopherece.github.io/peepals_prj/ |
-| Support email | REPLACE-WITH-CONTACT-EMAIL |
+| Support email | support@topitsolutions.co.nz |
 
 ## Text
 
