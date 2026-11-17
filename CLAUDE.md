@@ -18,11 +18,12 @@ The project uses npm (`package-lock.json`), not bun.
 npx expo start      # dev server on port 2233 (RCT_METRO_PORT in .env)
 npx expo lint       # lint (eslint-config-expo)
 npx tsc --noEmit    # typecheck
+npm test            # unit tests (Jest)
 ```
 
 Release builds use EAS (`eas.json`; steps in README "Ship it"). `app.config.ts` extends `app.json` to add the `react-native-maps` plugin when `GOOGLE_MAPS_API_KEY` is set (Android needs it outside Expo Go). `EXPO_PUBLIC_SUPABASE_*` must be set as EAS environment variables, since `.env.local` is not uploaded.
 
-There is no test runner or test suite. Run lint and typecheck before declaring work done.
+`npm test` runs Jest (`jest-expo` preset) on the pure logic in `lib/` (tests live in `__tests__/`, named `*-test.ts`; never inside `app/`, where every file is a route). Run tests, lint and typecheck before declaring work done.
 
 The map (`react-native-maps`) only works on iOS/Android; `components/ToiletMap.web.tsx` is a placeholder, so the web build is only for quick UI checks.
 
