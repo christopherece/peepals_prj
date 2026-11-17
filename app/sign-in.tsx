@@ -5,11 +5,12 @@ import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, TextInput, 
 
 import PressableScale from '@/components/PressableScale';
 import SheetGrabber from '@/components/SheetGrabber';
+import SocialSignIn from '@/components/SocialSignIn';
 import { Text, useThemeColor } from '@/components/Themed';
 import { Radius, Space } from '@/constants/Typography';
 import { useToilets } from '@/lib/ToiletsContext';
 import type { MemberAction } from '@/lib/useRequireMember';
-import type { SignInMethod } from '@/lib/types';
+import type { SignInMethod, SocialProvider } from '@/lib/types';
 
 const ACTION_COPY: Record<MemberAction, string> = {
   review: 'Sign in to leave a review.',
@@ -22,13 +23,14 @@ const ACTION_COPY: Record<MemberAction, string> = {
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
 /**
- * Email sign-in sheet, opened by `useRequireMember` when a guest tries to contribute.
- * Shared backend: email → 6-digit code. Offline mode: email + nickname, saved on this phone.
+ * Sign-in sheet, opened by `useRequireMember` when a guest tries to contribute.
+ * Shared backend: Google / Facebook / Apple (if switched on), or email → 6-digit code.
+ * Offline mode: email + nickname, saved on this phone.
  */
 export default function SignInSheet() {
   const router = useRouter();
   const { action } = useLocalSearchParams<{ action?: MemberAction }>();
-  const { shared, sendEmailCode, signIn } = useToilets();
+  const { shared, sendEmailCode, signIn, socialProviders, signInWith } = useToilets();
   const text = useThemeColor({}, 'text');
   const muted = useThemeColor({}, 'muted');
   const card = useThemeColor({}, 'card');
@@ -54,6 +56,14 @@ export default function SignInSheet() {
   const finish = (method: SignInMethod) =>
     run(async () => {
       await signIn(method);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    });
+
+  const withProvider = (provider: SocialProvider) =>
+    run(async () => {
+      // false = they backed out of the provider's screen; leave the sheet open.
+      if (!(await signInWith(provider))) return;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     });
@@ -110,6 +120,7 @@ export default function SignInSheet() {
   } else {
     body = (
       <>
+        {shared && <SocialSignIn providers={socialProviders} disabled={busy} onPress={withProvider} />}
         <View style={styles.field}>
           <Text type="subhead">Email</Text>
           <TextInput

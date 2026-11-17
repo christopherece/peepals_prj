@@ -65,6 +65,12 @@ export const localBackend: Backend = {
     return profile;
   },
 
+  socialProviders: [],
+
+  async signInWithProvider() {
+    throw new Error('Google, Facebook and Apple sign-in need the shared backend.');
+  },
+
   async signOut() {
     // Keeps reviews, toilets and photos; they come back if the user signs in again.
     await AsyncStorage.removeItem(PROFILE_KEY);

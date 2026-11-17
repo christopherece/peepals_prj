@@ -1,7 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { File } from 'expo-file-system';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 
-import type { Photo, Profile, Review, Toilet } from '../types';
+import { PROVIDER_NAME, enabledSocialProviders, redirectParams } from '../socialAuth';
+
+import type { Photo, Profile, Review, SocialProvider, Toilet } from '../types';
 import type { Backend } from './types';
 
 type ReviewRow = {
@@ -53,6 +59,7 @@ const PHOTO_COLUMNS = 'id, toilet_id, user_id, path, created_at';
  * dashboard; give both to the stores in the review notes). Unset = feature off.
  */
 const REVIEW_EMAIL = process.env.EXPO_PUBLIC_REVIEW_EMAIL?.trim().toLowerCase() || null;
+
 const isReviewAccount = (email: string) => REVIEW_EMAIL !== null && email.trim().toLowerCase() === REVIEW_EMAIL;
 
 function toReview(row: ReviewRow): Review {
@@ -140,6 +147,67 @@ export function createSupabaseBackend(supabase: SupabaseClient): Backend {
       if (error) throw new Error(`That code didn't work: ${error.message}`);
       if (!data.user) throw new Error("Couldn't sign in.");
       return loadProfile(data.user);
+    },
+
+    socialProviders: enabledSocialProviders(process.env.EXPO_PUBLIC_AUTH_PROVIDERS, Platform.OS),
+
+    async signInWithProvider(provider) {
+      const name = PROVIDER_NAME[provider];
+
+      if (provider === 'apple') {
+        // Native Apple sheet; Supabase checks Apple's signed token.
+        let credential: AppleAuthentication.AppleAuthenticationCredential;
+        try {
+          credential = await AppleAuthentication.signInAsync({
+            requestedScopes: [
+              AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+              AppleAuthentication.AppleAuthenticationScope.EMAIL,
+            ],
+          });
+        } catch (e) {
+          if ((e as { code?: string }).code === 'ERR_REQUEST_CANCELED') return null;
+          throw e;
+        }
+        if (!credential.identityToken) throw new Error("Apple didn't confirm who you are. Please try again.");
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token: credential.identityToken,
+        });
+        if (error) throw new Error(`Couldn't sign in with Apple: ${error.message}`);
+        return loadProfile(data.user);
+      }
+
+      // Google / Facebook: their sign-in page in a secure browser sheet, which hands back to the app.
+      const redirectTo = Linking.createURL('auth-callback');
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo, skipBrowserRedirect: true },
+      });
+      if (error || !data.url) throw new Error(`Couldn't open ${name} sign-in: ${error?.message ?? 'no link'}`);
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      if (result.type !== 'success') return null;
+
+      const params = redirectParams(result.url);
+      if (params.error) {
+        throw new Error(`${name} sign-in didn't work: ${params.error_description ?? params.error}`);
+      }
+      if (params.code) {
+        const exchanged = await supabase.auth.exchangeCodeForSession(params.code);
+        if (exchanged.error) throw new Error(`Couldn't sign in with ${name}: ${exchanged.error.message}`);
+        return loadProfile(exchanged.data.user);
+      }
+      if (params.access_token && params.refresh_token) {
+        const session = await supabase.auth.setSession({
+          access_token: params.access_token,
+          refresh_token: params.refresh_token,
+        });
+        if (session.error || !session.data.user) {
+          throw new Error(`Couldn't sign in with ${name}: ${session.error?.message ?? 'no account'}`);
+        }
+        return loadProfile(session.data.user);
+      }
+      throw new Error(`${name} didn't send you back signed in. Please try again.`);
     },
 
     async signOut() {

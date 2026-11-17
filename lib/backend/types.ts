@@ -1,4 +1,4 @@
-import type { Coords, NewReview, NewToilet, Photo, PickedPhoto, Profile, ReportTarget, Review, SignInMethod, Toilet } from '../types';
+import type { Coords, NewReview, NewToilet, Photo, PickedPhoto, Profile, ReportTarget, Review, SignInMethod, SocialProvider, Toilet } from '../types';
 
 /**
  * Where reviews, user-added toilets, photos and accounts are stored.
@@ -15,6 +15,10 @@ export type Backend = {
   /** Emails a 6-digit sign-in code (shared backend only; offline mode signs in with `device`). */
   sendEmailCode(email: string): Promise<void>;
   signIn(method: SignInMethod): Promise<Profile>;
+  /** Social sign-ins switched on for this build and platform, in display order. Empty offline. */
+  socialProviders: SocialProvider[];
+  /** Signs in with Google, Facebook or Apple. Resolves null if the user backs out. */
+  signInWithProvider(provider: SocialProvider): Promise<Profile | null>;
   signOut(): Promise<void>;
   updateNickname(profile: Profile, nickname: string): Promise<Profile>;
   /** Permanently removes the account and everything it posted (reviews, photos, added toilets). */

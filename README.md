@@ -32,6 +32,41 @@ Anyone can browse the map, search and get directions as a **guest**. Leaving a r
    (Project URL and the publishable key).
 5. Restart `npx expo start`. The Profile tab should now say reviews are shared.
 
+## Social sign-in (Google, Facebook, Apple)
+
+The sign-in sheet shows "Continue with Google / Facebook / Apple" above the email code, but only for the
+providers listed in `EXPO_PUBLIC_AUTH_PROVIDERS` (e.g. `google,facebook,apple`). Switch each one on in
+Supabase **before** listing it, or its button will just show an error.
+Apple's rule (guideline 4.8): on iPhone, Google and Facebook only appear when Apple is listed too.
+
+Your Supabase callback URL (used below): `https://<project-ref>.supabase.co/auth/v1/callback`
+
+**0. Let Supabase send people back to the app.** Supabase → Authentication → URL Configuration →
+Redirect URLs → add `peepals://**`, and `exp://**` for testing in Expo Go.
+
+**Google.** Google Cloud Console (same project as the Maps key) → Google Auth Platform:
+1. Branding: app name Peepals, support email, privacy policy URL. Audience: External, then **Publish app**
+   (only the basic email/profile scopes are used, so Google doesn't need to review it).
+2. Clients → Create client → **Web application** → Authorized redirect URIs: the Supabase callback URL.
+3. Copy the Client ID and Client secret into Supabase → Authentication → Sign In / Providers → **Google**, enable, save.
+
+**Facebook.** developers.facebook.com → My Apps → Create app → use case "Authenticate and request data from
+users with Facebook Login":
+1. Facebook Login → Settings → Valid OAuth Redirect URIs: the Supabase callback URL.
+2. Use cases → Authentication → make sure `email` and `public_profile` are added.
+3. App settings → Basic: add the privacy policy and data deletion URLs (the GitHub Pages ones), then copy
+   App ID and App secret into Supabase → Providers → **Facebook**, enable, save.
+4. Switch the app from Development to **Live**, or only people with a role on the Meta app can sign in.
+
+**Apple (iPhone).** Needs the Apple Developer account. The app uses Apple's native sheet, so no secret key:
+Supabase → Providers → **Apple**, enable, and under Client IDs enter `com.christopherece.peepals`
+(add `host.exp.Exponent` too to test in Expo Go on an iPhone). EAS turns on the Sign in with Apple
+capability for the build.
+
+**Then list them:** add `EXPO_PUBLIC_AUTH_PROVIDERS=google,facebook,apple` to `.env.local`, and for builds:
+`npx eas-cli@latest env:create production --name EXPO_PUBLIC_AUTH_PROVIDERS --value google,facebook,apple --visibility plaintext`
+(and the same for `preview`). New builds pick it up; it's baked in at build time.
+
 ## Ship it (iOS and Android)
 
 Builds run in the cloud with [EAS](https://docs.expo.dev/build/introduction/); profiles are in `eas.json`.

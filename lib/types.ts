@@ -41,6 +41,9 @@ export type Profile = {
 export type SignInMethod =
   { kind: 'email-code'; email: string; code: string } | { kind: 'device'; email: string; nickname: string };
 
+/** Sign-in with another account, shared backend only. Apple is iOS-only (native sheet). */
+export type SocialProvider = 'google' | 'facebook' | 'apple';
+
 export type Photo = {
   id: string;
   toiletId: string;

@@ -18,6 +18,7 @@ import {
   type ReportTarget,
   type Review,
   type SignInMethod,
+  type SocialProvider,
   type Toilet,
 } from './types';
 
@@ -53,6 +54,10 @@ type ToiletsContextValue = {
   shared: boolean;
   sendEmailCode: (email: string) => Promise<void>;
   signIn: (method: SignInMethod) => Promise<void>;
+  /** Google / Facebook / Apple buttons to show on the sign-in sheet (empty offline). */
+  socialProviders: SocialProvider[];
+  /** Resolves true once signed in, false if the user backed out of the provider's screen. */
+  signInWith: (provider: SocialProvider) => Promise<boolean>;
   signOut: () => Promise<void>;
   /** These throw for guests; gate the UI with `useRequireMember` first. */
   addReview: (review: NewReview) => Promise<void>;
@@ -218,6 +223,12 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
     setProfile(await backend.signIn(method));
   }, []);
 
+  const signInWith = useCallback(async (provider: SocialProvider) => {
+    const member = await backend.signInWithProvider(provider);
+    if (member) setProfile(member);
+    return member !== null;
+  }, []);
+
   const signOut = useCallback(async () => {
     await backend.signOut();
     setProfile(null);
@@ -298,6 +309,8 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       shared: backend.shared,
       sendEmailCode: backend.sendEmailCode,
       signIn,
+      socialProviders: backend.socialProviders,
+      signInWith,
       signOut,
       addReview,
       addToilet,
@@ -320,6 +333,7 @@ export function ToiletsProvider({ children }: { children: ReactNode }) {
       profile,
       authReady,
       signIn,
+      signInWith,
       signOut,
       addReview,
       addToilet,
